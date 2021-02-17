@@ -1,0 +1,10 @@
+config BR2_PACKAGE_OPENHAB
+	bool "openhab"
+	select BR2_PACKAGE_OPENJDK
+	help
+	  open Home Automation Bus is an open source home automation 
+	  software written in Java. It is deployed on premise and 
+	  connects to devices and services from different vendors. 
+	  As of 2019, close to 300 bindings are available as OSGi modules.
+
+	  https://www.openhab.org/
