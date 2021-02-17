@@ -1,0 +1,70 @@
+#!/bin/sh
+
+RUNTIME="/usr/share/openhab/runtime"
+
+running() {
+	proc_count=$(ps | grep {karaf} | grep $RUNTIME | grep -v grep | wc -l)
+	if [ $proc_count = 0 ] && ! $1; then
+		return 0
+	elif [ $proc_count != 0 ] && $1; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+wait_for_running() {
+	i=0
+	while ! running $1; do
+		if [ $i = $2 ]; then
+			return 1
+		fi
+		sleep 1
+		let "i++"
+	done
+	return 0
+}
+
+start() {
+	printf "Starting openhab: "
+	if running true; then
+		echo "FAIL"
+		return
+	fi
+
+	$RUNTIME/bin/start >/dev/null 2>&1 &
+	wait_for_running true 5 && echo "OK" || echo "FAIL"
+}
+
+stop() {
+	# stop is always a blocking call
+	# this is done for two reasons:
+	# 1. ensure a graceful device shutdown
+	# 2. ensure a proper application restart
+
+	printf "Stopping openhab: "
+	if running false; then
+		echo "FAIL"
+		return
+	fi
+
+	$RUNTIME/bin/stop >/dev/null 2>&1
+	wait_for_running false 60 && echo "OK" || echo "FAIL"
+}
+
+case "$1" in
+start)
+	start
+	;;
+stop)
+	stop
+	;;
+restart)
+	stop
+	sleep 1
+	start
+	;;
+*)
+	echo "Usage: $0 {start|stop|restart}"
+	;;
+esac
