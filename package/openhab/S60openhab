@@ -1,0 +1,22 @@
+#!/bin/sh
+
+case "$1" in
+	start)
+		printf "Starting openhab: "
+		/usr/share/openhab/start.sh start
+		[ $? = 0 ] && echo "OK" || echo "FAIL"
+		;;
+	stop)
+		printf "Stopping openhab: "
+		/usr/share/openhab/start.sh stop
+		[ $? = 0 ] && echo "OK" || echo "FAIL"
+		;;
+	restart)
+		"$0" stop
+		sleep 1
+		"$0" start
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart}"
+		;;
+esac
