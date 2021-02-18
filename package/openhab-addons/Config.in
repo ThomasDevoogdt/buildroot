@@ -1,0 +1,11 @@
+config BR2_PACKAGE_OPENHAB_ADDONS
+	bool "openhab-addons"
+	select BR2_PACKAGE_OPENHAB
+	help
+	  Download the add-on archives for offline use and put them 
+	  in the addons folder of the extracted distribution:
+	  
+	  You don't need the add-ons archives if your machine has Internet access, 
+	  openHAB will download add-ons you need online as necessary.
+	  
+	  https://www.openhab.org/
