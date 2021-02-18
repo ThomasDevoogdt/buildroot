@@ -31,4 +31,11 @@ config BR2_PACKAGE_OPENSSH_KEY_UTILS
 	help
 	  Key utilities: ssh-keygen, ssh-keyscan.
 
+config BR2_TARGET_ENABLE_ROOT_LOGIN_SSH
+	bool "Enable root login with password over ssh"
+	default n
+	help
+	  Allow root to log in with a password over ssh.
+
 endif
+

@@ -46,6 +46,14 @@ else
 OPENSSH_CONF_OPTS += --without-audit
 endif
 
+ifeq ($(BR2_TARGET_ENABLE_ROOT_LOGIN_SSH),y)
+define OPENSSH_INSTALL_ROOT_LOGIN_CONF
+	$(SED) 's/\#PermitRootLogin prohibit-password/PermitRootLogin yes/' $(TARGET_DIR)/etc/ssh/sshd_config
+endef
+
+OPENSSH_POST_INSTALL_TARGET_HOOKS += OPENSSH_INSTALL_ROOT_LOGIN_CONF
+endif
+
 ifeq ($(BR2_PACKAGE_LINUX_PAM),y)
 define OPENSSH_INSTALL_PAM_CONF
 	$(INSTALL) -D -m 644 $(@D)/contrib/sshd.pam.generic $(TARGET_DIR)/etc/pam.d/sshd
