@@ -9,3 +9,9 @@ config BR2_PACKAGE_OPENSSH
 	  friends.
 
 	  http://www.openssh.com/
+
+config BR2_TARGET_ENABLE_ROOT_LOGIN_SSH
+	bool "Enable root login with password over ssh"
+	default n
+	help
+	  Allow root to log in with a password over ssh.
