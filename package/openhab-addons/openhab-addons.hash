@@ -1,0 +1,4 @@
+# From https://dl.bintray.com/openhab/mvn/org/openhab/distro/openhab-addons/$(version)/openhab-addons-$(version).kar.md5
+md5  e9efbfe8834275f032d6bce7913d5ef0  openhab-addons-3.0.1.kar
+# Locally computed
+sha256  4ecc619dee28f61cae2378350ca799eea2852ec2177a1c7d755833393664431c  openhab-addons-3.0.1.kar

@@ -1922,6 +1922,7 @@ endif
 	source "package/musl-fts/Config.in"
 	source "package/openblas/Config.in"
 	source "package/openhab/Config.in"
+	source "package/openhab-addons/Config.in"
 	source "package/orc/Config.in"
 	source "package/p11-kit/Config.in"
 	source "package/poco/Config.in"
