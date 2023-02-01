@@ -1,0 +1,56 @@
+From aca354ae22c55fa6051d04a9f674fe0825443a94 Mon Sep 17 00:00:00 2001
+From: Thomas Devoogdt <thomas.devoogdt@barco.com>
+Date: Wed, 1 Feb 2023 11:26:56 +0100
+Subject: [PATCH] lib: c-ares: fixup static_assert
+
+"undefined reference to 'static_assert'"
+
+Not defined when using uClibc or if not C++ >= 11.
+
+upstream: https://github.com/c-ares/c-ares/issues/504
+
+Signed-off-by: Thomas Devoogdt <thomas.devoogdt@barco.com>
+---
+ lib/c-ares-1.18.1/configure                      | 4 ++++
+ lib/c-ares-1.18.1/m4/ax_cxx_compile_stdcxx_11.m4 | 3 +++
+ 2 files changed, 7 insertions(+)
+
+diff --git a/lib/c-ares-1.18.1/configure b/lib/c-ares-1.18.1/configure
+index 737f0a0dd..b99b7ed49 100755
+--- a/lib/c-ares-1.18.1/configure
++++ b/lib/c-ares-1.18.1/configure
+@@ -6316,6 +6316,8 @@ else $as_nop
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+ 
++#define static_assert _Static_assert
++
+   template <typename T>
+     struct check
+     {
+@@ -6393,6 +6395,8 @@ else $as_nop
+          cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+ 
++#define static_assert _Static_assert
++
+   template <typename T>
+     struct check
+     {
+diff --git a/lib/c-ares-1.18.1/m4/ax_cxx_compile_stdcxx_11.m4 b/lib/c-ares-1.18.1/m4/ax_cxx_compile_stdcxx_11.m4
+index 229de3091..fe4a11c67 100644
+--- a/lib/c-ares-1.18.1/m4/ax_cxx_compile_stdcxx_11.m4
++++ b/lib/c-ares-1.18.1/m4/ax_cxx_compile_stdcxx_11.m4
+@@ -37,6 +37,9 @@
+ #serial 9
+ 
+ m4_define([_AX_CXX_COMPILE_STDCXX_11_testbody], [[
++
++#define static_assert _Static_assert
++
+   template <typename T>
+     struct check
+     {
+-- 
+2.39.0
+
