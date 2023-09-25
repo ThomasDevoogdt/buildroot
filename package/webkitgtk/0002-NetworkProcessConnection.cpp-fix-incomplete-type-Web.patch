@@ -1,0 +1,38 @@
+From 1816d3f4b2417d54c7adcc8ec6158c402016ac00 Mon Sep 17 00:00:00 2001
+From: Thomas Devoogdt <thomas.devoogdt@barco.com>
+Date: Thu, 28 Sep 2023 17:29:32 +0200
+Subject: [PATCH] NetworkProcessConnection.cpp: fix incomplete type
+ WebCore::Page
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Reviewed by NOBODY (OOPS!).
+
+webkitgtk-2.42.0/Source/WebKit/WebProcess/Network/NetworkProcessConnection.cpp:327:11: error: incomplete type ‘WebCore::Page’ used in nested name specifier
+  327 |     Page::forEachPage([&] (auto& page) {
+      |           ^~~~~~~~~~~
+
+Upstream: main & 2.42
+ - main: https://github.com/WebKit/WebKit/pull/18356
+ - 2.42: https://github.com/WebKit/WebKit/pull/18355
+Signed-off-by: Thomas Devoogdt <thomas.devoogdt@barco.com>
+---
+ Source/WebKit/WebProcess/Network/NetworkProcessConnection.cpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Source/WebKit/WebProcess/Network/NetworkProcessConnection.cpp b/Source/WebKit/WebProcess/Network/NetworkProcessConnection.cpp
+index d6f22b0b1739..7c4779c0e037 100644
+--- a/Source/WebKit/WebProcess/Network/NetworkProcessConnection.cpp
++++ b/Source/WebKit/WebProcess/Network/NetworkProcessConnection.cpp
+@@ -68,6 +68,7 @@
+ #include <WebCore/InspectorInstrumentationWebKit.h>
+ #include <WebCore/MemoryCache.h>
+ #include <WebCore/MessagePort.h>
++#include <WebCore/Page.h>
+ #include <WebCore/SharedBuffer.h>
+ #include <pal/SessionID.h>
+ 
+-- 
+2.42.0
+

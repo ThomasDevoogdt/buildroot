@@ -1,0 +1,274 @@
+From 1e70a0236581bac49ef5fd47b82d62538969b294 Mon Sep 17 00:00:00 2001
+From: Thomas Devoogdt <thomas.devoogdt@barco.com>
+Date: Thu, 28 Sep 2023 13:26:05 +0200
+Subject: [PATCH] fix USE_EGL checks when GBM renderer is used
+
+https://bugs.webkit.org/show_bug.cgi?id=262169
+
+Reviewed by NOBODY (OOPS!).
+
+Regression since commit 81c064ddb4182a34a36def401025d223ca0d31ba.
+
+webkitgtk-2.42.0/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.cpp:39:10: fatal error: epoxy/egl.h: No such file or directory
+   39 | #include <epoxy/egl.h>
+      |          ^~~~~~~~~~~~~
+
+Upstream: main & 2.42
+ - main: https://github.com/WebKit/WebKit/pull/18346
+ - 2.42: https://github.com/WebKit/WebKit/pull/18347
+Signed-off-by: Thomas Devoogdt <thomas.devoogdt@barco.com>
+---
+ .../WebKit/UIProcess/API/glib/WebKitProtocolHandler.cpp   | 8 ++++++++
+ Source/WebKit/UIProcess/glib/WebProcessPoolGLib.cpp       | 4 +++-
+ Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp   | 6 +++---
+ .../UIProcess/gtk/AcceleratedBackingStoreDMABuf.cpp       | 4 ++++
+ .../WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.h  | 4 ++++
+ .../gtk/AcceleratedBackingStoreDMABuf.messages.in         | 2 ++
+ Source/WebKit/WebProcess/WebPage/AcceleratedSurface.cpp   | 4 ++--
+ .../WebProcess/WebPage/gtk/AcceleratedSurfaceDMABuf.cpp   | 4 ++++
+ .../WebProcess/WebPage/gtk/AcceleratedSurfaceDMABuf.h     | 4 ++++
+ .../WebPage/gtk/AcceleratedSurfaceDMABuf.messages.in      | 2 ++
+ Source/WebKit/WebProcess/glib/WebProcessGLib.cpp          | 2 +-
+ 11 files changed, 37 insertions(+), 7 deletions(-)
+
+diff --git a/Source/WebKit/UIProcess/API/glib/WebKitProtocolHandler.cpp b/Source/WebKit/UIProcess/API/glib/WebKitProtocolHandler.cpp
+index 8bdcf48b446a..19b46a137d5b 100644
+--- a/Source/WebKit/UIProcess/API/glib/WebKitProtocolHandler.cpp
++++ b/Source/WebKit/UIProcess/API/glib/WebKitProtocolHandler.cpp
+@@ -45,9 +45,11 @@
+ #endif
+ 
+ #if PLATFORM(GTK)
++#if USE(EGL)
+ #include "AcceleratedBackingStoreDMABuf.h"
+ #include "DMABufRendererBufferMode.h"
+ #include <WebCore/PlatformDisplaySurfaceless.h>
++#endif
+ #include <gtk/gtk.h>
+ 
+ #if PLATFORM(WAYLAND)
+@@ -164,6 +166,7 @@ static String dmabufRendererWithSupportedBuffers()
+ {
+     StringBuilder buffers;
+     buffers.append("DMABuf (Supported buffers: "_s);
++#if USE(EGL)
+     auto mode = AcceleratedBackingStoreDMABuf::rendererBufferMode();
+     if (mode.contains(DMABufRendererBufferMode::Hardware))
+         buffers.append("Hardware"_s);
+@@ -172,6 +175,7 @@ static String dmabufRendererWithSupportedBuffers()
+             buffers.append(", ");
+         buffers.append("Shared Memory"_s);
+     }
++#endif
+     buffers.append(')');
+     return buffers.toString();
+ }
+@@ -269,7 +273,11 @@ void WebKitProtocolHandler::handleGPU(WebKitURISchemeRequest* request)
+ #if PLATFORM(GTK)
+     addTableRow(versionObject, "GTK version"_s, makeString(GTK_MAJOR_VERSION, '.', GTK_MINOR_VERSION, '.', GTK_MICRO_VERSION, " (build) "_s, gtk_get_major_version(), '.', gtk_get_minor_version(), '.', gtk_get_micro_version(), " (runtime)"_s));
+ 
++#if USE(EGL)
+     bool usingDMABufRenderer = AcceleratedBackingStoreDMABuf::checkRequirements();
++#else
++    bool usingDMABufRenderer = false;
++#endif
+ 
+ #if PLATFORM(WAYLAND)
+     if (PlatformDisplay::sharedDisplay().type() == PlatformDisplay::Type::Wayland && !usingDMABufRenderer) {
+diff --git a/Source/WebKit/UIProcess/glib/WebProcessPoolGLib.cpp b/Source/WebKit/UIProcess/glib/WebProcessPoolGLib.cpp
+index d439751cee32..151c4b854cc3 100644
+--- a/Source/WebKit/UIProcess/glib/WebProcessPoolGLib.cpp
++++ b/Source/WebKit/UIProcess/glib/WebProcessPoolGLib.cpp
+@@ -54,8 +54,10 @@
+ 
+ #if PLATFORM(GTK)
+ #include "GtkSettingsManager.h"
++#if USE(EGL)
+ #include "AcceleratedBackingStoreDMABuf.h"
+ #endif
++#endif
+ 
+ 
+ namespace WebKit {
+@@ -88,7 +90,7 @@ void WebProcessPool::platformInitializeWebProcess(const WebProcessProxy& process
+     parameters.renderDeviceFile = WebCore::PlatformDisplay::sharedDisplay().drmRenderNodeFile();
+ #endif
+ 
+-#if PLATFORM(GTK)
++#if PLATFORM(GTK) && USE(EGL)
+     parameters.dmaBufRendererBufferMode = AcceleratedBackingStoreDMABuf::rendererBufferMode();
+ #endif
+ 
+diff --git a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp
+index df4cdc2ada3d..2e8a6f59513e 100644
+--- a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp
++++ b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp
+@@ -40,7 +40,7 @@
+ #include "AcceleratedBackingStoreX11.h"
+ #endif
+ 
+-#if PLATFORM(GTK)
++#if PLATFORM(GTK) && USE(EGL)
+ #include "AcceleratedBackingStoreDMABuf.h"
+ #endif
+ 
+@@ -72,7 +72,7 @@ static bool gtkCanUseHardwareAcceleration()
+ 
+ bool AcceleratedBackingStore::checkRequirements()
+ {
+-#if PLATFORM(GTK)
++#if PLATFORM(GTK) && USE(EGL)
+     if (AcceleratedBackingStoreDMABuf::checkRequirements())
+         return gtkCanUseHardwareAcceleration();
+ #endif
+@@ -93,7 +93,7 @@ std::unique_ptr<AcceleratedBackingStore> AcceleratedBackingStore::create(WebPage
+     if (!HardwareAccelerationManager::singleton().canUseHardwareAcceleration())
+         return nullptr;
+ 
+-#if PLATFORM(GTK)
++#if PLATFORM(GTK) && USE(EGL)
+     if (AcceleratedBackingStoreDMABuf::checkRequirements())
+         return AcceleratedBackingStoreDMABuf::create(webPage);
+ #endif
+diff --git a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.cpp b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.cpp
+index 2a8d7127909d..64d04332a598 100644
+--- a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.cpp
++++ b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.cpp
+@@ -26,6 +26,8 @@
+ #include "config.h"
+ #include "AcceleratedBackingStoreDMABuf.h"
+ 
++#if USE(EGL)
++
+ #include "AcceleratedBackingStoreDMABufMessages.h"
+ #include "AcceleratedSurfaceDMABufMessages.h"
+ #include "DMABufRendererBufferMode.h"
+@@ -575,3 +577,5 @@ bool AcceleratedBackingStoreDMABuf::paint(cairo_t* cr, const WebCore::IntRect& c
+ #endif
+ 
+ } // namespace WebKit
++
++#endif // USE(EGL)
+diff --git a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.h b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.h
+index 1bc769ada313..f9a6cb620e38 100644
+--- a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.h
++++ b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.h
+@@ -25,6 +25,8 @@
+ 
+ #pragma once
+ 
++#if USE(EGL)
++
+ #include "AcceleratedBackingStore.h"
+ 
+ #include "MessageReceiver.h"
+@@ -200,3 +202,5 @@ private:
+ };
+ 
+ } // namespace WebKit
++
++#endif // USE(EGL)
+diff --git a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.messages.in b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.messages.in
+index 28e3fabf693a..3ba247e40220 100644
+--- a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.messages.in
++++ b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStoreDMABuf.messages.in
+@@ -20,8 +20,10 @@
+ # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
++#if USE(EGL)
+ messages -> AcceleratedBackingStoreDMABuf NotRefCounted {
+     Configure(UnixFileDescriptor backFD, UnixFileDescriptor frontFD, UnixFileDescriptor displayFD, WebCore::IntSize size, uint32_t format, uint32_t offset, uint32_t stride, uint64_t modifier)
+     ConfigureSHM(WebKit::ShareableBitmap::Handle backBufferHandle, WebKit::ShareableBitmap::Handle frontBufferHandle, WebKit::ShareableBitmap::Handle displayBufferHandle)
+     Frame()
+ }
++#endif
+diff --git a/Source/WebKit/WebProcess/WebPage/AcceleratedSurface.cpp b/Source/WebKit/WebProcess/WebPage/AcceleratedSurface.cpp
+index 1f64ab26c9dd..683a5350be22 100644
+--- a/Source/WebKit/WebProcess/WebPage/AcceleratedSurface.cpp
++++ b/Source/WebKit/WebProcess/WebPage/AcceleratedSurface.cpp
+@@ -37,7 +37,7 @@
+ #include "AcceleratedSurfaceLibWPE.h"
+ #endif
+ 
+-#if PLATFORM(GTK)
++#if PLATFORM(GTK) && USE(EGL)
+ #include "AcceleratedSurfaceDMABuf.h"
+ #endif
+ 
+@@ -46,7 +46,7 @@ using namespace WebCore;
+ 
+ std::unique_ptr<AcceleratedSurface> AcceleratedSurface::create(WebPage& webPage, Client& client)
+ {
+-#if PLATFORM(GTK)
++#if PLATFORM(GTK) && USE(EGL)
+ #if USE(GBM)
+     if (PlatformDisplay::sharedDisplayForCompositing().type() == PlatformDisplay::Type::GBM)
+         return AcceleratedSurfaceDMABuf::create(webPage, client);
+diff --git a/Source/WebKit/WebProcess/WebPage/gtk/AcceleratedSurfaceDMABuf.cpp b/Source/WebKit/WebProcess/WebPage/gtk/AcceleratedSurfaceDMABuf.cpp
+index dc2d544c9d25..d474c4ca205c 100644
+--- a/Source/WebKit/WebProcess/WebPage/gtk/AcceleratedSurfaceDMABuf.cpp
++++ b/Source/WebKit/WebProcess/WebPage/gtk/AcceleratedSurfaceDMABuf.cpp
+@@ -26,6 +26,8 @@
+ #include "config.h"
+ #include "AcceleratedSurfaceDMABuf.h"
+ 
++#if USE(EGL)
++
+ #include "AcceleratedBackingStoreDMABufMessages.h"
+ #include "AcceleratedSurfaceDMABufMessages.h"
+ #include "ShareableBitmap.h"
+@@ -490,3 +492,5 @@ void AcceleratedSurfaceDMABuf::frameDone()
+ }
+ 
+ } // namespace WebKit
++
++#endif // USE(EGL)
+diff --git a/Source/WebKit/WebProcess/WebPage/gtk/AcceleratedSurfaceDMABuf.h b/Source/WebKit/WebProcess/WebPage/gtk/AcceleratedSurfaceDMABuf.h
+index e3985d468ad2..a230a1f02eef 100644
+--- a/Source/WebKit/WebProcess/WebPage/gtk/AcceleratedSurfaceDMABuf.h
++++ b/Source/WebKit/WebProcess/WebPage/gtk/AcceleratedSurfaceDMABuf.h
+@@ -25,6 +25,8 @@
+ 
+ #pragma once
+ 
++#if USE(EGL)
++
+ #include "AcceleratedSurface.h"
+ 
+ #include "MessageReceiver.h"
+@@ -156,3 +158,5 @@ private:
+ };
+ 
+ } // namespace WebKit
++
++#endif // USE(EGL)
+diff --git a/Source/WebKit/WebProcess/WebPage/gtk/AcceleratedSurfaceDMABuf.messages.in b/Source/WebKit/WebProcess/WebPage/gtk/AcceleratedSurfaceDMABuf.messages.in
+index 0d0d2dbf9069..a481cd9bc60f 100644
+--- a/Source/WebKit/WebProcess/WebPage/gtk/AcceleratedSurfaceDMABuf.messages.in
++++ b/Source/WebKit/WebProcess/WebPage/gtk/AcceleratedSurfaceDMABuf.messages.in
+@@ -20,6 +20,8 @@
+ # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
++#if USE(EGL)
+ messages -> AcceleratedSurfaceDMABuf NotRefCounted {
+     FrameDone()
+ }
++#endif
+diff --git a/Source/WebKit/WebProcess/glib/WebProcessGLib.cpp b/Source/WebKit/WebProcess/glib/WebProcessGLib.cpp
+index 686004f4ee82..e298cf9b94a2 100644
+--- a/Source/WebKit/WebProcess/glib/WebProcessGLib.cpp
++++ b/Source/WebKit/WebProcess/glib/WebProcessGLib.cpp
+@@ -141,7 +141,7 @@ void WebProcess::platformInitializeWebProcess(WebProcessCreationParameters& para
+     WebCore::GBMDevice::singleton().initialize(parameters.renderDeviceFile);
+ #endif
+ 
+-#if PLATFORM(GTK)
++#if PLATFORM(GTK) && USE(EGL)
+     m_dmaBufRendererBufferMode = parameters.dmaBufRendererBufferMode;
+     if (!m_dmaBufRendererBufferMode.isEmpty()) {
+ #if USE(GBM)
+-- 
+2.42.0
+
