@@ -1,0 +1,56 @@
+From e723bc4ad6f70942b564b8fd38473f58ce0a1219 Mon Sep 17 00:00:00 2001
+From: Thomas Devoogdt <thomas.devoogdt@barco.com>
+Date: Wed, 12 Jun 2024 12:16:36 +0200
+Subject: [PATCH] plot/plot.c: put UNIX_X11 behind a compile directives
+
+Signed-off-by: Thomas Devoogdt <thomas.devoogdt@barco.com>
+---
+ plot/plot.c | 25 +++++++++++++++++++++++--
+ 1 file changed, 23 insertions(+), 2 deletions(-)
+
+diff --git a/plot/plot.c b/plot/plot.c
+index 884c044..b2898fc 100644
+--- a/plot/plot.c
++++ b/plot/plot.c
+@@ -2449,7 +2449,7 @@ static void DoPlot(NSRect *rect, plot_info *pdp) {
+ 
+ }
+ 
+-#else /* Assume UNIX + X11 */
++#elif defined(UNIX_X11) /* Assume UNIX + X11 */
+ /* ********************************** X11 version ********************** */
+ 
+ /* !!!! There is a problem if the user closes the window - an X11 error results */
+@@ -2983,7 +2983,28 @@ plot_info *pdp
+ 	}
+ }
+ 
+-#endif /* UNIX + X11 */
++#else
++
++static int do_plot_imp(
++	int flags,
++	double xmin, double xmax, double ymin, double ymax,
++	double ratio,
++	int dowait,
++	double *x1, double *x2,
++	double *yy[MXGPHS], plot_col *ncols, char **ntext,
++	int n,
++	double *x7, double *y7, plot_col *mcols, char **mtext,
++	int m,
++	double *x8, double *y8, double *x9, double*y9, plot_col *ocols,
++	int o,
++	double *xp, double *yp, plot_sym *tp, plot_col *pcols, char **ptext,
++	int p
++) {
++	// Not Implemented.
++	return 0;
++}
++
++#endif
+ #endif /* !NT */
+ /***********************************************************************/
+ 
+-- 
+2.45.2
+
