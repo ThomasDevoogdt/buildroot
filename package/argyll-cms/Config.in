@@ -1,0 +1,16 @@
+config BR2_PACKAGE_ARGYLL_CMS
+	bool "Argyll CMS"
+	depends on BR2_TOOLCHAIN_HAS_THREADS
+	depends on !BR2_STATIC_LIBS # include dlfcn.h
+	select BR2_PACKAGE_JPEG
+	select BR2_PACKAGE_LIBPNG
+	select BR2_PACKAGE_OPENSSL
+	select BR2_PACKAGE_TIFF
+	select BR2_PACKAGE_ZLIB
+	help
+	  ArgyllCMS is an ICC compatible color management system.
+
+	  https://www.argyllcms.com/
+
+comment "Argyll CMS needs a toolchain w/ dynamic library, threads"
+	depends on BR2_STATIC_LIBS || !BR2_TOOLCHAIN_HAS_THREADS

@@ -1,0 +1,179 @@
+From 1065b74a194c08a056c5f5bcb531a8e2b50d10f2 Mon Sep 17 00:00:00 2001
+From: Thomas Devoogdt <thomas.devoogdt@barco.com>
+Date: Wed, 12 Jun 2024 14:06:09 +0200
+Subject: [PATCH] spectro: fix directives when UNIX_X11 is not set
+
+Signed-off-by: Thomas Devoogdt <thomas.devoogdt@barco.com>
+---
+ spectro/colorhug.c |  2 +-
+ spectro/hidio.c    | 10 +++++-----
+ spectro/i1d3.c     |  2 +-
+ spectro/munki.c    |  2 +-
+ spectro/oemarch.c  |  9 +++------
+ spectro/usbio.c    |  3 +--
+ spectro/usbio.h    |  6 ++----
+ 7 files changed, 14 insertions(+), 20 deletions(-)
+
+diff --git a/spectro/colorhug.c b/spectro/colorhug.c
+index 649f762..aafb5af 100644
+--- a/spectro/colorhug.c
++++ b/spectro/colorhug.c
+@@ -454,7 +454,7 @@ colorhug_init_coms(inst *pp, baud_rate br, flow_control fc, double tout) {
+ 
+ 		a1logd(p->log, 3, "colorhug_init_coms: About to init USB\n");
+ 
+-#if defined(UNIX_X11)
++#if defined(UNIX)
+ 		usbflags |= icomuf_detach;
+ 		/* Some Linux drivers can't open the device a second time, so */
+ 		/* use the reset on close workaround. */
+diff --git a/spectro/hidio.c b/spectro/hidio.c
+index 9fb274c..25b7559 100644
+--- a/spectro/hidio.c
++++ b/spectro/hidio.c
+@@ -83,7 +83,7 @@
+ #include <setupapi.h>
+ #endif
+ 
+-#if defined(UNIX_X11)
++#if defined(UNIX)
+ #include <sys/ioctl.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+@@ -431,7 +431,7 @@ int hid_get_paths(icompaths *p) {
+ #endif	/* __MAC_OS_X_VERSION_MAX_ALLOWED < 1060 */
+ #endif /* UNIX_APPLE */
+ 
+-#if defined(UNIX_X11)
++#if defined(UNIX)
+ 
+ 	/* This is how we'd go about adding HID support for Linux, IF it */
+ 	/* was actually capable of communicating application composed reports - */
+@@ -484,7 +484,7 @@ int hid_get_paths(icompaths *p) {
+ 		}
+ 	}
+ #endif /* NEVER */
+-#endif /* UNIX_X11 */
++#endif /* UNIX */
+ 
+ 	a1logd(p->log, 8, "icoms_get_paths: returning %d paths and ICOM_OK\n",p->ndpaths[dtix_combined]);
+ 
+@@ -1116,7 +1116,7 @@ int hid_copy_hid_idevice(icoms *d, icompath *s) {
+ 	IOObjectRetain(d->hidd->ioob);
+ #endif	/* __MAC_OS_X_VERSION_MAX_ALLOWED < 1060 */
+ #endif	/* UNIX_APPLE */
+-#if defined (UNIX_X11)
++#if defined (UNIX)
+ #endif
+ 	return ICOM_OK;
+ }
+@@ -1139,7 +1139,7 @@ void hid_del_hid_idevice(struct hid_idevice *hidd) {
+ 		IOObjectRelease(hidd->ioob);
+ #endif	/* __MAC_OS_X_VERSION_MAX_ALLOWED < 1060 */
+ #endif	/* UNIX_APPLE */
+-#if defined (UNIX_X11)
++#if defined (UNIX)
+ #endif
+ 	free(hidd);
+ }
+diff --git a/spectro/i1d3.c b/spectro/i1d3.c
+index 46ce444..3faa113 100644
+--- a/spectro/i1d3.c
++++ b/spectro/i1d3.c
+@@ -2810,7 +2810,7 @@ i1d3_init_coms(inst *pp, baud_rate br, flow_control fc, double tout) {
+ 
+ 	/* On Linux, the i1d3 doesn't seem to close properly, and won't re-open - */
+ 	/* something to do with detaching the default HID driver ?? */
+-#if defined(UNIX_X11)
++#if defined(UNIX)
+ 	usbflags |= icomuf_detach;
+ 	usbflags |= icomuf_reset_before_close;
+ #endif
+diff --git a/spectro/munki.c b/spectro/munki.c
+index 3b96328..705b233 100644
+--- a/spectro/munki.c
++++ b/spectro/munki.c
+@@ -72,7 +72,7 @@ static inst_code
+ munki_init_coms(inst *pp, baud_rate br, flow_control fc, double tout) {
+ 	munki *p = (munki *) pp;
+ 	int se;
+-#if defined(UNIX_X11)
++#if defined(UNIX)
+ 	/* Some Linux drivers fail to start every second time the device is opened */
+ 	/* if no clear halt is done on open, and some do the opposite. So */
+ 	/* reset after close to avoid the problem in all cases. */ 
+diff --git a/spectro/oemarch.c b/spectro/oemarch.c
+index 95a950d..307f6ad 100644
+--- a/spectro/oemarch.c
++++ b/spectro/oemarch.c
+@@ -129,8 +129,7 @@ oem_target oemtargs = {
+ 		{ "/Installer/ColorMunkiDisplaySetup.exe", targ_i1d3_edr },
+ 		{ NULL }
+ 	}
+-#endif /* UNIX_APPLE */
+-#ifdef UNIX_X11
++#elif defined(UNIX)
+ 	{	/* Installed files */
+ 		{ NULL }
+ 	},
+@@ -165,7 +164,7 @@ oem_target oemtargs = {
+ 		{ "/Installer/ColorMunkiDisplaySetup.exe", targ_i1d3_edr },
+ 		{ NULL }
+ 	}
+-#endif /* UNIX_X11 */
++#endif
+ };
+ 
+ #if defined(UNIX_APPLE)
+@@ -668,9 +667,7 @@ static xfile *locate_volume(int verb) {
+ 			}
+ 		}
+ 	}
+-#endif /* UNIX_APPLE */
+-
+-#if defined(UNIX_X11)
++#elif defined(UNIX)
+ 		{
+ 			int j;
+ 
+diff --git a/spectro/usbio.c b/spectro/usbio.c
+index 89bb867..3f146ab 100644
+--- a/spectro/usbio.c
++++ b/spectro/usbio.c
+@@ -99,8 +99,7 @@ static int icoms_usb_wait_io(
+ #endif
+ #if defined(UNIX_APPLE)
+ # include "usbio_ox.c"
+-#endif
+-#if defined(UNIX_X11)
++#elif defined(UNIX)
+ # if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__FreeBSD_kernel__)
+ #  include "usbio_bsd.c"
+ # else
+diff --git a/spectro/usbio.h b/spectro/usbio.h
+index fdf6808..a1b6487 100644
+--- a/spectro/usbio.h
++++ b/spectro/usbio.h
+@@ -146,9 +146,7 @@ struct usb_idevice {
+ 	CFRunLoopRef cfrunloop;     /* RunLoop */
+ 	CFRunLoopSourceRef cfsource;/* Device event sources */
+ };
+-# endif	/* OS X */
+-
+-# if defined(UNIX_X11)
++# elif defined(UNIX)
+ 
+ #  if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
+ 
+@@ -188,7 +186,7 @@ struct usb_idevice {
+ 
+ #  endif /* Linux */
+ 
+-# endif	/* UNIX */
++# endif
+ 
+ /* - - - - - - - - - - - - - - - - - - - - - - - - - - */
+ 
+-- 
+2.45.2
+

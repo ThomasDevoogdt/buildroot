@@ -1,0 +1,25 @@
+From dbc5cc13c37e4c4fac3b9c9f167d2b707aea0651 Mon Sep 17 00:00:00 2001
+From: Thomas Devoogdt <thomas.devoogdt@barco.com>
+Date: Wed, 12 Jun 2024 13:47:57 +0200
+Subject: [PATCH] xml/mxml-config.h: fix missing stddef include
+
+Signed-off-by: Thomas Devoogdt <thomas.devoogdt@barco.com>
+---
+ xml/mxml-config.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/xml/mxml-config.h b/xml/mxml-config.h
+index 072eab9..da6f672 100644
+--- a/xml/mxml-config.h
++++ b/xml/mxml-config.h
+@@ -138,6 +138,7 @@ extern int	_mxml_vsnprintf(char *, size_t, const char *, va_list);
+  * Include necessary headers...
+  */
+ 
++#include <stddef.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+-- 
+2.45.2
+

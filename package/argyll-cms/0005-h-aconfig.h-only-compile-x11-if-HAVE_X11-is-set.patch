@@ -1,0 +1,34 @@
+From 32db7074e2eba6988db94f0d2deadaad29a3d2d8 Mon Sep 17 00:00:00 2001
+From: Thomas Devoogdt <thomas.devoogdt@barco.com>
+Date: Wed, 12 Jun 2024 13:59:39 +0200
+Subject: [PATCH] h/aconfig.h: only compile x11 if HAVE_X11 is set
+
+Signed-off-by: Thomas Devoogdt <thomas.devoogdt@barco.com>
+---
+ h/aconfig.h | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/h/aconfig.h b/h/aconfig.h
+index 7617ed2..994c734 100644
+--- a/h/aconfig.h
++++ b/h/aconfig.h
+@@ -63,11 +63,14 @@
+ #if defined(UNIX)
+ # if defined(__APPLE__)
+ #  define UNIX_APPLE
+-#  undef  UNIX_X11
+ # else
+-#  define UNIX_X11
+ #  undef  UNIX_APPLE
+ # endif
++# if defined(HAVE_X11)
++#  define UNIX_X11
++# else
++#  undef  UNIX_X11
++# endif
+ #endif
+ 
+ #ifdef UNIX_X11
+-- 
+2.45.2
+
