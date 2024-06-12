@@ -1,0 +1,82 @@
+From abad8c12909fc624dd70512e8c1df43e35763537 Mon Sep 17 00:00:00 2001
+From: Thomas Devoogdt <thomas.devoogdt@barco.com>
+Date: Wed, 12 Jun 2024 13:42:57 +0200
+Subject: [PATCH] {various}: rename sys_stat to stat
+
+Signed-off-by: Thomas Devoogdt <thomas.devoogdt@barco.com>
+---
+ plot/vrml.c          | 2 +-
+ spectro/i1pro3_imp.c | 2 +-
+ spectro/i1pro_imp.c  | 2 +-
+ spectro/munki_imp.c  | 2 +-
+ spectro/rspec.c      | 2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/plot/vrml.c b/plot/vrml.c
+index e83e250..d082a77 100644
+--- a/plot/vrml.c
++++ b/plot/vrml.c
+@@ -1761,7 +1761,7 @@ static int do_flush(vrml *s) {
+ 		/* Check that there are the x3dom files with the output file */
+ 		if (s->fmt == fmt_x3dom) {
+ 			char *xl, *x3name;
+-			struct sys_stat sbuf;
++			struct stat sbuf;
+ 			FILE *fp;
+ 			char *oflags = 
+ #if !defined(O_CREAT) && !defined(_O_CREAT)		// No O_BINARY possible
+diff --git a/spectro/i1pro3_imp.c b/spectro/i1pro3_imp.c
+index 088af05..6ae9a9b 100644
+--- a/spectro/i1pro3_imp.c
++++ b/spectro/i1pro3_imp.c
+@@ -2958,7 +2958,7 @@ i1pro3_code i1pro3_restore_calibration(i1pro3 *p) {
+ 
+ 	/* Check the last modification time */
+ 	{
+-		struct sys_stat sbuf;
++		struct stat sbuf;
+ 
+ 		if (sys_stat(cal_paths[0], &sbuf) == 0) {
+ 			m->lo_secs = time(NULL) - sbuf.st_mtime;
+diff --git a/spectro/i1pro_imp.c b/spectro/i1pro_imp.c
+index 1151015..aa8a9b4 100644
+--- a/spectro/i1pro_imp.c
++++ b/spectro/i1pro_imp.c
+@@ -4497,7 +4497,7 @@ i1pro_code i1pro_restore_calibration(i1pro *p) {
+ 
+ 	/* Check the last modification time */
+ 	{
+-		struct sys_stat sbuf;
++		struct stat sbuf;
+ 
+ 		if (sys_stat(cal_paths[0], &sbuf) == 0) {
+ 			m->lo_secs = time(NULL) - sbuf.st_mtime;
+diff --git a/spectro/munki_imp.c b/spectro/munki_imp.c
+index 72e04d0..8f78e20 100644
+--- a/spectro/munki_imp.c
++++ b/spectro/munki_imp.c
+@@ -3323,7 +3323,7 @@ munki_code munki_restore_calibration(munki *p) {
+ 
+ 	/* Check the last modification time */
+ 	{
+-		struct sys_stat sbuf;
++		struct stat sbuf;
+ 
+ 		if (sys_stat(cal_paths[0], &sbuf) == 0) {
+ 			m->lo_secs = time(NULL) - sbuf.st_mtime;
+diff --git a/spectro/rspec.c b/spectro/rspec.c
+index c53014b..965b766 100644
+--- a/spectro/rspec.c
++++ b/spectro/rspec.c
+@@ -961,7 +961,7 @@ int calf_open(calf *x, a1log *log, char *fname, int wr) {
+ 
+ 	/* Check the last modification time */
+ 	if (!wr) {
+-		struct sys_stat sbuf;
++		struct stat sbuf;
+ 
+ 		if (sys_stat(cal_paths[0], &sbuf) == 0) {
+ 			x->lo_secs = time(NULL) - sbuf.st_mtime;
+-- 
+2.45.2
+
