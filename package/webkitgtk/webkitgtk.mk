@@ -14,8 +14,8 @@ WEBKITGTK_LICENSE_FILES = \
 	Source/WebCore/LICENSE-LGPL-2.1
 WEBKITGTK_CPE_ID_VENDOR = webkitgtk
 WEBKITGTK_DEPENDENCIES = host-ruby host-python3 host-gperf host-unifdef \
-	enchant harfbuzz icu jpeg libegl libepoxy libgcrypt libsecret \
-	libsoup3 libtasn1 libxml2 libxslt sqlite webp woff2
+	enchant harfbuzz icu jpeg libegl libepoxy libgcrypt libsecret libtasn1 \
+	libxml2 libxslt sqlite webp woff2
 
 WEBKITGTK_CMAKE_BACKEND = ninja
 
@@ -30,6 +30,14 @@ WEBKITGTK_CONF_OPTS = \
 	-DUSE_AVIF=OFF \
 	-DUSE_LIBHYPHEN=OFF \
 	-DUSE_WOFF2=ON
+
+ifeq ($(BR2_PACKAGE_LIBSOUP),y)
+WEBKITGTK_CONF_OPTS += -DUSE_SOUP2=ON
+WEBKITGTK_DEPENDENCIES += libsoup
+else
+WEBKITGTK_CONF_OPTS += -DUSE_SOUP2=OFF
+WEBKITGTK_DEPENDENCIES += libsoup3
+endif
 
 ifeq ($(BR2_PACKAGE_LIBGTK4),y)
 WEBKITGTK_CONF_OPTS += -DUSE_GTK4=ON
@@ -74,9 +82,15 @@ define WEBKITGTK_INSTALL_MINIBROWSER_SYMLINK
 	ln -sf ../libexec/webkitgtk-6.0/MiniBrowser $(TARGET_DIR)/usr/bin/MiniBrowser
 endef
 else
+ifeq ($(BR2_PACKAGE_LIBSOUP),y)
+define WEBKITGTK_INSTALL_MINIBROWSER_SYMLINK
+	ln -sf ../libexec/webkit2gtk-4.0/MiniBrowser $(TARGET_DIR)/usr/bin/MiniBrowser
+endef
+else
 define WEBKITGTK_INSTALL_MINIBROWSER_SYMLINK
 	ln -sf ../libexec/webkit2gtk-4.1/MiniBrowser $(TARGET_DIR)/usr/bin/MiniBrowser
 endef
+endif
 endif
 WEBKITGTK_POST_INSTALL_TARGET_HOOKS += WEBKITGTK_INSTALL_MINIBROWSER_SYMLINK
 WEBKITGTK_CONF_OPTS += -DENABLE_MINIBROWSER=ON
