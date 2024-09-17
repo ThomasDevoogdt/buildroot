@@ -21,6 +21,7 @@ LIBGTK4_DEPENDENCIES = \
 	graphene \
 	libepoxy \
 	libglib2 \
+	libpng \
 	pango \
 	$(TARGET_NLS_DEPENDENCIES)
 
