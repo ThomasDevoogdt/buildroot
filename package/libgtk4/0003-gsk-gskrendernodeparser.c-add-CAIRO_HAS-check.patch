@@ -1,0 +1,31 @@
+From 853e852d9f8de5c474c64a0f6b56924ccffe54a3 Mon Sep 17 00:00:00 2001
+From: Thomas Devoogdt <thomas@devoogdt.com>
+Date: Sun, 15 Sep 2024 20:51:20 +0200
+Subject: [PATCH] gsk/gskrendernodeparser.c: add CAIRO_HAS check
+
+resolves #5072
+
+Signed-off-by: Thomas Devoogdt <thomas@devoogdt.com>
+(cherry picked from commit 3610ac0fd1e6e17e280b17cde7d9b1c995ede351)
+Upstream: https://gitlab.gnome.org/GNOME/gtk/-/merge_requests/7717
+---
+ gsk/gskrendernodeparser.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/gsk/gskrendernodeparser.c b/gsk/gskrendernodeparser.c
+index 9f7602d98d..aa24163f23 100644
+--- a/gsk/gskrendernodeparser.c
++++ b/gsk/gskrendernodeparser.c
+@@ -4415,7 +4415,9 @@ render_node_print (Printer       *p,
+         if (surface != NULL)
+           {
+             array = g_byte_array_new ();
++#if CAIRO_HAS_PNG_FUNCTIONS
+             cairo_surface_write_to_png_stream (surface, cairo_write_array, array);
++#endif
+ 
+             _indent (p);
+             g_string_append (p->str, "pixels: url(\"data:image/png;base64,");
+-- 
+2.43.0
+

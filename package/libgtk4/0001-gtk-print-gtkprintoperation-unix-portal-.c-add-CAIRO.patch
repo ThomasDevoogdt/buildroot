@@ -1,0 +1,198 @@
+From 44c2d24ea45d3014458e7d4f77fb6332b9746436 Mon Sep 17 00:00:00 2001
+From: Thomas Devoogdt <thomas@devoogdt.com>
+Date: Sun, 15 Sep 2024 19:50:51 +0200
+Subject: [PATCH] gtk/print/gtkprintoperation{,-unix,-portal}.c: add CAIRO_HAS
+ checks
+
+This is similar to the checks in tools/gtk-rendernode-tool-render.c.
+
+resolves #5072
+
+Signed-off-by: Thomas Devoogdt <thomas@devoogdt.com>
+(cherry picked from commit ffc8f34dfd560f36659aa1d5b5684fa97c4f4ebc)
+Upstream: https://gitlab.gnome.org/GNOME/gtk/-/merge_requests/7717
+---
+ gtk/print/gtkprintoperation-portal.c |  9 +++++++++
+ gtk/print/gtkprintoperation-unix.c   | 17 +++++++++++++++++
+ gtk/print/gtkprintoperation.c        | 10 +++++++++-
+ 3 files changed, 35 insertions(+), 1 deletion(-)
+
+diff --git a/gtk/print/gtkprintoperation-portal.c b/gtk/print/gtkprintoperation-portal.c
+index afc276067b..3b91bf0830 100644
+--- a/gtk/print/gtkprintoperation-portal.c
++++ b/gtk/print/gtkprintoperation-portal.c
+@@ -24,8 +24,13 @@
+ #include <sys/stat.h>
+ #include <fcntl.h>
+ 
++#include <cairo.h>
++#ifdef CAIRO_HAS_PDF_SURFACE
+ #include <cairo-pdf.h>
++#endif
++#ifdef CAIRO_HAS_PS_SURFACE
+ #include <cairo-ps.h>
++#endif
+ 
+ #include <gio/gunixfdlist.h>
+ 
+@@ -147,6 +152,7 @@ portal_start_page (GtkPrintOperation *op,
+     {
+       if (type == CAIRO_SURFACE_TYPE_PS)
+         {
++#ifdef CAIRO_HAS_PS_SURFACE
+           cairo_ps_surface_set_size (op_portal->surface, w, h);
+           cairo_ps_surface_dsc_begin_page_setup (op_portal->surface);
+           switch (gtk_page_setup_get_orientation (page_setup))
+@@ -164,15 +170,18 @@ portal_start_page (GtkPrintOperation *op,
+               default:
+                 break;
+             }
++#endif
+          }
+       else if (type == CAIRO_SURFACE_TYPE_PDF)
+         {
++#ifdef CAIRO_HAS_PDF_SURFACE
+           if (!op->priv->manual_orientation)
+             {
+               w = gtk_page_setup_get_paper_width (page_setup, GTK_UNIT_POINTS);
+               h = gtk_page_setup_get_paper_height (page_setup, GTK_UNIT_POINTS);
+             }
+           cairo_pdf_surface_set_size (op_portal->surface, w, h);
++#endif
+         }
+     }
+ }
+diff --git a/gtk/print/gtkprintoperation-unix.c b/gtk/print/gtkprintoperation-unix.c
+index cf52c56463..b61b9f5fd9 100644
+--- a/gtk/print/gtkprintoperation-unix.c
++++ b/gtk/print/gtkprintoperation-unix.c
+@@ -36,8 +36,13 @@
+ #include "gtkprintoperation-private.h"
+ #include "gtkprintoperation-portal.h"
+ 
++#include <cairo.h>
++#ifdef CAIRO_HAS_PDF_SURFACE
+ #include <cairo-pdf.h>
++#endif
++#ifdef CAIRO_HAS_PS_SURFACE
+ #include <cairo-ps.h>
++#endif
+ #include "gtkprintunixdialog.h"
+ #include "gtkpagesetupunixdialog.h"
+ #include "gtkprintbackendprivate.h"
+@@ -90,6 +95,7 @@ unix_start_page (GtkPrintOperation *op,
+     {
+       if (type == CAIRO_SURFACE_TYPE_PS)
+         {
++#ifdef CAIRO_HAS_PS_SURFACE
+           cairo_ps_surface_set_size (op_unix->surface, w, h);
+           cairo_ps_surface_dsc_begin_page_setup (op_unix->surface);
+           switch (gtk_page_setup_get_orientation (page_setup))
+@@ -106,15 +112,18 @@ unix_start_page (GtkPrintOperation *op,
+               default:
+                 break;
+             }
++#endif
+          }
+       else if (type == CAIRO_SURFACE_TYPE_PDF)
+         {
++#ifdef CAIRO_HAS_PDF_SURFACE
+           if (!op->priv->manual_orientation)
+             {
+               w = gtk_page_setup_get_paper_width (page_setup, GTK_UNIT_POINTS);
+               h = gtk_page_setup_get_paper_height (page_setup, GTK_UNIT_POINTS);
+             }
+           cairo_pdf_surface_set_size (op_unix->surface, w, h);
++#endif
+         }
+     }
+ }
+@@ -746,6 +755,7 @@ gtk_print_operation_unix_run_dialog_async (GtkPrintOperation          *op,
+     }
+ }
+ 
++#ifdef CAIRO_HAS_PDF_SURFACE
+ static cairo_status_t
+ write_preview (void                *closure,
+                const unsigned char *data,
+@@ -817,6 +827,7 @@ gtk_print_operation_unix_create_preview_surface (GtkPrintOperation *op,
+ 
+   return surface;
+ }
++#endif
+ 
+ static void
+ gtk_print_operation_unix_preview_start_page (GtkPrintOperation *op,
+@@ -838,11 +849,13 @@ gtk_print_operation_unix_resize_preview_surface (GtkPrintOperation *op,
+                                                  GtkPageSetup      *page_setup,
+                                                  cairo_surface_t   *surface)
+ {
++#ifdef CAIRO_HAS_PDF_SURFACE
+   double w, h;
+ 
+   w = gtk_page_setup_get_paper_width (page_setup, GTK_UNIT_POINTS);
+   h = gtk_page_setup_get_paper_height (page_setup, GTK_UNIT_POINTS);
+   cairo_pdf_surface_set_size (surface, w, h);
++#endif
+ }
+ 
+ static GtkPrintOperationResult
+@@ -1292,7 +1305,11 @@ _gtk_print_operation_platform_backend_create_preview_surface (GtkPrintOperation
+ 							      double            *dpi_y,
+ 							      char             **target)
+ {
++#ifdef CAIRO_HAS_PDF_SURFACE
+   return gtk_print_operation_unix_create_preview_surface (op, page_setup, dpi_x, dpi_y, target);
++#else
++  return NULL;
++#endif
+ }
+ 
+ void
+diff --git a/gtk/print/gtkprintoperation.c b/gtk/print/gtkprintoperation.c
+index 8aa8976a10..bacd7b21ed 100644
+--- a/gtk/print/gtkprintoperation.c
++++ b/gtk/print/gtkprintoperation.c
+@@ -23,7 +23,10 @@
+ #include <math.h>
+ #include <string.h>
+ 
++#include <cairo.h>
++#ifdef CAIRO_HAS_PDF_SURFACE
+ #include <cairo-pdf.h>
++#endif
+ 
+ #include <glib/gi18n-lib.h>
+ #include "gtkmarshalers.h"
+@@ -1953,6 +1956,7 @@ create_page_setup (GtkPrintOperation *op)
+   return page_setup;
+ }
+ 
++#ifdef CAIRO_HAS_PDF_SURFACE
+ static void 
+ pdf_start_page (GtkPrintOperation *op,
+ 		GtkPrintContext   *print_context,
+@@ -2063,7 +2067,7 @@ run_pdf (GtkPrintOperation  *op,
+   
+   return GTK_PRINT_OPERATION_RESULT_APPLY; 
+ }
+-
++#endif
+ 
+ static void
+ clamp_page_ranges (PrintPagesData *data)
+@@ -3096,7 +3100,11 @@ gtk_print_operation_run (GtkPrintOperation        *op,
+        */
+       priv->is_sync = TRUE;
+       g_return_val_if_fail (priv->export_filename != NULL, GTK_PRINT_OPERATION_RESULT_ERROR);
++#ifdef CAIRO_HAS_PDF_SURFACE
+       result = run_pdf (op, parent, &do_print);
++#else
++      result = GTK_PRINT_OPERATION_RESULT_ERROR;
++#endif
+     }
+   else if (action == GTK_PRINT_OPERATION_ACTION_PREVIEW)
+     {
+-- 
+2.43.0
+
