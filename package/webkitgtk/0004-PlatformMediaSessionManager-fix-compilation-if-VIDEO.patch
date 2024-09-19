@@ -1,0 +1,121 @@
+From 2de4ad38d46b3e36e10a688ec4a54fac660df3ac Mon Sep 17 00:00:00 2001
+From: Thomas Devoogdt <thomas@devoogdt.com>
+Date: Sat, 19 Oct 2024 09:53:05 -0700
+Subject: [PATCH] PlatformMediaSessionManager: fix compilation if VIDEO or
+ WEB_AUDIO is not enabled https://bugs.webkit.org/show_bug.cgi?id=281825
+
+Reviewed by Philippe Normand.
+
+WebCore::Page::activeNowPlayingSessionUpdateTimerFired, and
+WebCore::PlatformMediaSessionManager::hasActiveNowPlayingSessionInGroup,
+are using methods from WebCore::PlatformMediaSessionManager.
+
+Canonical link: https://commits.webkit.org/285473@main
+
+Upstream: https://github.com/WebKit/WebKit/pull/35491
+Signed-off-by: Thomas Devoogdt <thomas@devoogdt.com>
+---
+ .../audio/PlatformMediaSessionManager.cpp     | 25 +++++++++++--------
+ 1 file changed, 14 insertions(+), 11 deletions(-)
+
+diff --git a/Source/WebCore/platform/audio/PlatformMediaSessionManager.cpp b/Source/WebCore/platform/audio/PlatformMediaSessionManager.cpp
+index 999b08a1e845..aa2c85d5b478 100644
+--- a/Source/WebCore/platform/audio/PlatformMediaSessionManager.cpp
++++ b/Source/WebCore/platform/audio/PlatformMediaSessionManager.cpp
+@@ -37,8 +37,6 @@
+ 
+ namespace WebCore {
+ 
+-#if ENABLE(VIDEO) || ENABLE(WEB_AUDIO)
+-
+ #if ENABLE(WEBM_FORMAT_READER)
+ bool PlatformMediaSessionManager::m_webMFormatReaderEnabled;
+ #endif
+@@ -144,12 +142,16 @@ bool PlatformMediaSessionManager::has(PlatformMediaSession::MediaType type) cons
+ 
+ bool PlatformMediaSessionManager::activeAudioSessionRequired() const
+ {
++#if ENABLE(VIDEO) || ENABLE(WEB_AUDIO)
+     if (anyOfSessions([] (auto& session) { return session.activeAudioSessionRequired(); }))
+         return true;
+ 
+     return WTF::anyOf(m_audioCaptureSources, [](auto& source) {
+         return source.isCapturingAudio();
+     });
++#else
++    return false;
++#endif
+ }
+ 
+ bool PlatformMediaSessionManager::hasActiveAudioSession() const
+@@ -199,9 +201,11 @@ void PlatformMediaSessionManager::beginInterruption(PlatformMediaSession::Interr
+     ALWAYS_LOG(LOGIDENTIFIER);
+ 
+     m_currentInterruption = type;
++#if ENABLE(VIDEO) || ENABLE(WEB_AUDIO)
+     forEachSession([type] (auto& session) {
+         session.beginInterruption(type);
+     });
++#endif
+     scheduleUpdateSessionState();
+ }
+ 
+@@ -210,17 +214,21 @@ void PlatformMediaSessionManager::endInterruption(PlatformMediaSession::EndInter
+     ALWAYS_LOG(LOGIDENTIFIER);
+ 
+     m_currentInterruption = { };
++#if ENABLE(VIDEO) || ENABLE(WEB_AUDIO)
+     forEachSession([flags] (auto& session) {
+         session.endInterruption(flags);
+     });
++#endif
+ }
+ 
+ void PlatformMediaSessionManager::addSession(PlatformMediaSession& session)
+ {
+     ALWAYS_LOG(LOGIDENTIFIER, session.logIdentifier());
+     m_sessions.append(session);
++#if ENABLE(VIDEO) || ENABLE(WEB_AUDIO)
+     if (m_currentInterruption)
+         session.beginInterruption(*m_currentInterruption);
++#endif
+ 
+ #if !RELEASE_LOG_DISABLED
+     m_logger->addLogger(session.logger());
+@@ -273,6 +281,7 @@ bool PlatformMediaSessionManager::sessionWillBeginPlayback(PlatformMediaSession&
+ {
+     setCurrentSession(session);
+ 
++#if ENABLE(VIDEO) || ENABLE(WEB_AUDIO)
+     auto sessionType = session.mediaType();
+     auto restrictions = this->restrictions(sessionType);
+     if (session.state() == PlatformMediaSession::State::Interrupted && restrictions & InterruptedPlaybackNotPermitted) {
+@@ -299,6 +308,9 @@ bool PlatformMediaSessionManager::sessionWillBeginPlayback(PlatformMediaSession&
+     }
+     ALWAYS_LOG(LOGIDENTIFIER, session.logIdentifier(), " returning true");
+     return true;
++#else
++    return false;
++#endif
+ }
+     
+ void PlatformMediaSessionManager::sessionWillEndPlayback(PlatformMediaSession& session, DelayCallingUpdateNowPlaying)
+@@ -835,15 +847,6 @@ bool PlatformMediaSessionManager::swVPDecodersAlwaysEnabled()
+ }
+ #endif // ENABLE(VP9)
+ 
+-#else // ENABLE(VIDEO) || ENABLE(WEB_AUDIO)
+-
+-void PlatformMediaSessionManager::updateNowPlayingInfoIfNecessary()
+-{
+-
+-}
+-
+-#endif // ENABLE(VIDEO) || ENABLE(WEB_AUDIO)
+-
+ #if ENABLE(EXTENSION_CAPABILITIES)
+ bool PlatformMediaSessionManager::mediaCapabilityGrantsEnabled()
+ {
+-- 
+2.43.0
+

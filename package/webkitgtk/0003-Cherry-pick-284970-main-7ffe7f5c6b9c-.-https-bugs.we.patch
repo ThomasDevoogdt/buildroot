@@ -1,0 +1,46 @@
+From 7f14c42d4a554276e76fe2e3ba47fff758a4b8be Mon Sep 17 00:00:00 2001
+From: Olivier Blin <olivier.blin@softathome.com>
+Date: Thu, 10 Oct 2024 08:42:52 -0700
+Subject: [PATCH] Cherry-pick 284970@main (7ffe7f5c6b9c).
+ https://bugs.webkit.org/show_bug.cgi?id=281159
+
+    [GTK][WPE] Build broken with ENABLE_WEB_AUDIO=OFF
+    https://bugs.webkit.org/show_bug.cgi?id=281159
+
+    Reviewed by Miguel Gomez.
+
+    Since 280453@main, default values from UnifiedWebPreferences.yaml are used.
+    Do not try to use WebAudioEnabled when undefined.
+
+    * Source/WebKit/UIProcess/API/glib/WebKitSettings.cpp:
+    (webkit_settings_class_init):
+
+    Canonical link: https://commits.webkit.org/284970@main
+
+Canonical link: https://commits.webkit.org/282416.204@webkitglib/2.46
+
+Upstream: https://github.com/WebKit/WebKit/commit/6b59562904cd85cebdd91106308d35c5e112858d
+Signed-off-by: Thomas Devoogdt <thomas@devoogdt.com>
+---
+ Source/WebKit/UIProcess/API/glib/WebKitSettings.cpp | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/Source/WebKit/UIProcess/API/glib/WebKitSettings.cpp b/Source/WebKit/UIProcess/API/glib/WebKitSettings.cpp
+index 9519ca834e83..0d67591ebdab 100644
+--- a/Source/WebKit/UIProcess/API/glib/WebKitSettings.cpp
++++ b/Source/WebKit/UIProcess/API/glib/WebKitSettings.cpp
+@@ -1102,7 +1102,11 @@ static void webkit_settings_class_init(WebKitSettingsClass* klass)
+             "enable-webaudio",
+             _("Enable WebAudio"),
+             _("Whether WebAudio content should be handled"),
++#if ENABLE(WEB_AUDIO)
+             FEATURE_DEFAULT(WebAudioEnabled),
++#else
++            FALSE,
++#endif
+             readWriteConstructParamFlags);
+ 
+     /**
+-- 
+2.43.0
+
