@@ -1,4 +1,4 @@
-From 9d825e854ef53ebbe0aea2f1a69f52b763104daf Mon Sep 17 00:00:00 2001
+From 444bb9dded67070756995c0704c4638ee5af61a0 Mon Sep 17 00:00:00 2001
 From: Ariadne Conill <ariadne@dereferenced.org>
 Date: Mon, 19 Sep 2022 14:15:12 +0200
 Subject: [PATCH] libbb: sockaddr2str: ensure only printable characters are
@@ -38,5 +38,5 @@ index 0e0b247b8..02c061e67 100644
  }
  
 -- 
-2.37.3
+2.43.0
 

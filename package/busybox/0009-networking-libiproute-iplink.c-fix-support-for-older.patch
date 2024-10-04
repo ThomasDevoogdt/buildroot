@@ -1,0 +1,62 @@
+From 39880b16b3eaf97fe6c494bf79aec9043a4ef6fc Mon Sep 17 00:00:00 2001
+From: Thomas Devoogdt <thomas@devoogdt.com>
+Date: Fri, 4 Oct 2024 15:32:55 +0200
+Subject: [PATCH] networking/libiproute/iplink.c: fix support for older kernels
+
+- The CAN netlink interface has been added in Linux v2.6.31 with only 3 options [1]:
+
+  CAN_CTRLMODE_LOOPBACK    0x1  /* Loopback mode */
+  CAN_CTRLMODE_LISTENONLY  0x2  /* Listen-only mode */
+  CAN_CTRLMODE_3_SAMPLES   0x4  /* Triple sampling mode */
+
+  So define the other options.
+
+- IFLA_CAN_TERMINATION has been added in Linux 4.11 [2],
+  define it for older kernels.
+
+[1] https://github.com/torvalds/linux/blob/v2.6.31/include/linux/can/netlink.h#L80-L82
+[2] https://github.com/torvalds/linux/commit/12a6075cabc0d9ffbc0366b44daa22f278606312
+
+Signed-off-by: Thomas Devoogdt <thomas@devoogdt.com>
+Signed-off-by: Denys Vlasenko <vda.linux@googlemail.com>
+Upstream: https://git.busybox.net/busybox/commit/?id=8953429a8253176adda4dcfbed4738e55ee3b8ea
+Signed-off-by: Thomas Devoogdt <thomas@devoogdt.com>
+---
+ networking/libiproute/iplink.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/networking/libiproute/iplink.c b/networking/libiproute/iplink.c
+index bc526d89c..7d6793e92 100644
+--- a/networking/libiproute/iplink.c
++++ b/networking/libiproute/iplink.c
+@@ -51,6 +51,27 @@ struct ifla_vlan_flags {
+ };
+ #endif
+ 
++#if ENABLE_FEATURE_IP_LINK_CAN
++# ifndef CAN_CTRLMODE_ONE_SHOT
++#  define CAN_CTRLMODE_ONE_SHOT         0x08 /* One-Shot mode */
++# endif
++# ifndef CAN_CTRLMODE_BERR_REPORTING
++#  define CAN_CTRLMODE_BERR_REPORTING	0x10 /* Bus-error reporting */
++# endif
++# ifndef CAN_CTRLMODE_FD
++#  define CAN_CTRLMODE_FD               0x20 /* CAN FD mode */
++# endif
++# ifndef CAN_CTRLMODE_PRESUME_ACK
++#  define CAN_CTRLMODE_PRESUME_ACK      0x40 /* Ignore missing CAN ACKs */
++# endif
++# ifndef CAN_CTRLMODE_FD_NON_ISO
++#  define CAN_CTRLMODE_FD_NON_ISO       0x80 /* CAN FD in non-ISO mode */
++# endif
++# ifndef IFLA_CAN_TERMINATION
++#  define IFLA_CAN_TERMINATION          11
++# endif
++#endif
++
+ /* taken from linux/sockios.h */
+ #define SIOCSIFNAME  0x8923  /* set interface name */
+ 
+-- 
+2.43.0
+
