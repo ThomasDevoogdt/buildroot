@@ -1,0 +1,26 @@
+From 9c248022da794e9422b37554fb9e316ffa71fd7a Mon Sep 17 00:00:00 2001
+From: Thomas Devoogdt <thomas@devoogdt.com>
+Date: Fri, 15 Nov 2024 08:22:23 +0100
+Subject: [PATCH] meson.build: add a check for the fenv header
+
+Upstream: https://gitlab.gnome.org/GNOME/gtk/-/merge_requests/7925
+Signed-off-by: Thomas Devoogdt <thomas@devoogdt.com>
+---
+ meson.build | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/meson.build b/meson.build
+index e4006a3f8f..f9fc0dcb70 100644
+--- a/meson.build
++++ b/meson.build
+@@ -191,6 +191,7 @@ cdata.set_quoted('GETTEXT_PACKAGE', 'gtk40')
+ 
+ check_headers = [
+   'dev/evdev/input.h',
++  'fenv.h',
+   'ftw.h',
+   'linux/input.h',
+   'linux/memfd.h',
+-- 
+2.43.0
+

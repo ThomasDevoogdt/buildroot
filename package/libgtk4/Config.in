@@ -27,6 +27,7 @@ config BR2_PACKAGE_LIBGTK4
 	select BR2_PACKAGE_GRAPHENE
 	select BR2_PACKAGE_LIBEPOXY
 	select BR2_PACKAGE_LIBGLIB2
+	select BR2_PACKAGE_LIBPNG
 	select BR2_PACKAGE_PANGO
 	select BR2_PACKAGE_TIFF
 	# At least one backend is required
