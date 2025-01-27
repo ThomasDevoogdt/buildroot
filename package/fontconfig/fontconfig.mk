@@ -20,5 +20,11 @@ FONTCONFIG_CONF_OPTS = \
 	-Dcache-dir=/var/cache/fontconfig \
 	-Ddoc=disabled
 
+FONTCONFIG_CFLAGS = $(TARGET_CFLAGS)
+
+ifeq ($(BR2_DEBUG_3),y)
+FONTCONFIG_CFLAGS += -g2
+endif
+
 $(eval $(meson-package))
 $(eval $(host-meson-package))
