@@ -1,0 +1,59 @@
+From 098cb4ea79c6b0a3579abd5a78b6283b23d878e8 Mon Sep 17 00:00:00 2001
+From: Thomas Devoogdt <thomas@devoogdt.com>
+Date: Sat, 22 Mar 2025 18:55:57 +0100
+Subject: [PATCH] WebFullScreenManager{Proxy,Manager}: add missing includes
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+https://bugs.webkit.org/show_bug.cgi?id=290261
+
+Reviewed by NOBODY (OOPS!).
+
+/home/thomas/br-test-pkg/bootlin-armv7-glibc/build/webkitgtk-2.48.0/Source/WebKit/WebProcess/FullScreen/WebFullScreenManager.h:69:140: error: ‘ExceptionOr’ is not a member of ‘WebCore’
+   69 |     void enterFullScreenForElement(WebCore::Element&, WebCore::HTMLMediaElementEnums::VideoFullscreenMode, CompletionHandler<void(WebCore::ExceptionOr<void>)>&&, CompletionHandler<bool(bool)>&&);
+      |                                                                                                                                            ^~~~~~~~~~~
+
+/home/thomas/br-test-pkg/bootlin-armv7-glibc/build/webkitgtk-2.48.0/Source/WebKit/WebProcess/FullScreen/WebFullScreenManager.h:79:42: error: ‘WebCore::FrameIdentifier’ has not been declared
+   79 |     void enterFullScreenForOwnerElements(WebCore::FrameIdentifier, CompletionHandler<void()>&&);
+      |                                          ^~~~~~~
+
+/home/thomas/br-test-pkg/bootlin-armv7-glibc/build/webkitgtk-2.48.0/Source/WebKit/UIProcess/WebFullScreenManagerProxy.h:104:58: error: ‘WebCore::FrameIdentifier’ has not been declared
+  104 |     void enterFullScreenForOwnerElementsInOtherProcesses(WebCore::FrameIdentifier, CompletionHandler<void()>&&);
+      |                                                          ^~~~~~~
+
+Upstream: https://github.com/WebKit/WebKit/pull/42882
+Signed-off-by: Thomas Devoogdt <thomas@devoogdt.com>
+---
+ Source/WebKit/UIProcess/WebFullScreenManagerProxy.h        | 1 +
+ Source/WebKit/WebProcess/FullScreen/WebFullScreenManager.h | 2 ++
+ 2 files changed, 3 insertions(+)
+
+diff --git a/Source/WebKit/UIProcess/WebFullScreenManagerProxy.h b/Source/WebKit/UIProcess/WebFullScreenManagerProxy.h
+index 7c7cc9d4fe69..9462fde9f9ba 100644
+--- a/Source/WebKit/UIProcess/WebFullScreenManagerProxy.h
++++ b/Source/WebKit/UIProcess/WebFullScreenManagerProxy.h
+@@ -30,6 +30,7 @@
+ #include "FullScreenMediaDetails.h"
+ #include "MessageReceiver.h"
+ #include <WebCore/BoxExtents.h>
++#include <WebCore/FrameIdentifier.h>
+ #include <WebCore/HTMLMediaElement.h>
+ #include <WebCore/HTMLMediaElementEnums.h>
+ #include <WebCore/ProcessIdentifier.h>
+diff --git a/Source/WebKit/WebProcess/FullScreen/WebFullScreenManager.h b/Source/WebKit/WebProcess/FullScreen/WebFullScreenManager.h
+index 5ae597f249c2..fa5cf026a681 100644
+--- a/Source/WebKit/WebProcess/FullScreen/WebFullScreenManager.h
++++ b/Source/WebKit/WebProcess/FullScreen/WebFullScreenManager.h
+@@ -28,6 +28,8 @@
+ #if ENABLE(FULLSCREEN_API)
+ 
+ #include <WebCore/EventListener.h>
++#include <WebCore/ExceptionOr.h>
++#include <WebCore/FrameIdentifier.h>
+ #include <WebCore/HTMLMediaElement.h>
+ #include <WebCore/HTMLMediaElementEnums.h>
+ #include <WebCore/IntRect.h>
+-- 
+2.43.0
+

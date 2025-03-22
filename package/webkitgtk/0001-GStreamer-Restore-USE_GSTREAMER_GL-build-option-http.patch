@@ -1,0 +1,775 @@
+From c2cb95ba5623b2434634e5499139bb9ff6bff1bd Mon Sep 17 00:00:00 2001
+From: Simon Pena <spena@igalia.com>
+Date: Thu, 6 Mar 2025 10:22:15 -0800
+Subject: [PATCH] [GStreamer] Restore USE_GSTREAMER_GL build option
+ https://bugs.webkit.org/show_bug.cgi?id=289231
+
+Reviewed by Carlos Garcia Campos.
+
+Some downstream ports are still unable to use GSTREAMER_GL. This
+addresses it by reverting 282892@main, as well as guarding the relevant
+new code that landed in the time the feature was gone.
+
+* Source/WebCore/platform/GStreamer.cmake:
+* Source/WebCore/platform/graphics/PlatformDisplay.cpp:
+(WebCore::PlatformDisplay::clearSharingGLContext):
+(WebCore::PlatformDisplay::terminateEGLDisplay):
+* Source/WebCore/platform/graphics/PlatformDisplay.h:
+* Source/WebCore/platform/graphics/gstreamer/GLVideoSinkGStreamer.cpp:
+* Source/WebCore/platform/graphics/gstreamer/GLVideoSinkGStreamer.h:
+* Source/WebCore/platform/graphics/gstreamer/GRefPtrGStreamer.cpp:
+* Source/WebCore/platform/graphics/gstreamer/GRefPtrGStreamer.h:
+* Source/WebCore/platform/graphics/gstreamer/GStreamerCommon.cpp:
+(WebCore::registerWebKitGStreamerElements):
+(WebCore::deinitializeGStreamer):
+* Source/WebCore/platform/graphics/gstreamer/GStreamerCommon.h:
+* Source/WebCore/platform/graphics/gstreamer/GStreamerVideoFrameConverter.cpp:
+(WebCore::GStreamerVideoFrameConverter::Pipeline::Pipeline):
+(WebCore::GStreamerVideoFrameConverter::Pipeline::run):
+(WebCore::GStreamerVideoFrameConverter::ensurePipeline):
+* Source/WebCore/platform/graphics/gstreamer/GStreamerVideoFrameConverter.h:
+* Source/WebCore/platform/graphics/gstreamer/GStreamerVideoSinkCommon.cpp:
+(WebKitVideoSinkProbe::doProbe):
+* Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp:
+(WebCore::MediaPlayerPrivateGStreamer::tearDown):
+(WebCore::MediaPlayerPrivateGStreamer::createVideoSink):
+* Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.h:
+* Source/WebCore/platform/graphics/gstreamer/PlatformDisplayGStreamer.cpp:
+* Source/WebCore/platform/graphics/gstreamer/VideoEncoderGStreamer.cpp:
+* Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.cpp:
+(WebCore::CoordinatedPlatformLayerBufferVideo::createBufferIfNeeded):
+(WebCore::CoordinatedPlatformLayerBufferVideo::paintToTextureMapper):
+* Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.h:
+* Source/cmake/GStreamerChecks.cmake:
+* Source/cmake/GStreamerDefinitions.cmake:
+* Source/cmake/GStreamerDependencies.cmake:
+* Tools/Scripts/webkitperl/FeatureList.pm:
+
+Canonical link: https://commits.webkit.org/291707@main
+
+Upstream: https://github.com/WebKit/WebKit/commit/e57d90ee7ddbd16c8d37534f5a57b368ed246f74
+[thomas: dropped the Tools/Scripts/webkitperl/FeatureList.pm part]
+Signed-off-by: Thomas Devoogdt <thomas@devoogdt.com>
+---
+ Source/WebCore/platform/GStreamer.cmake           | 11 +++++++++--
+ .../WebCore/platform/graphics/PlatformDisplay.cpp |  4 ++--
+ .../WebCore/platform/graphics/PlatformDisplay.h   |  8 ++++----
+ .../graphics/gstreamer/GLVideoSinkGStreamer.cpp   |  2 +-
+ .../graphics/gstreamer/GLVideoSinkGStreamer.h     |  4 ++--
+ .../graphics/gstreamer/GRefPtrGStreamer.cpp       |  9 ++++++++-
+ .../graphics/gstreamer/GRefPtrGStreamer.h         |  5 +++++
+ .../graphics/gstreamer/GStreamerCommon.cpp        |  9 +++++++--
+ .../platform/graphics/gstreamer/GStreamerCommon.h |  3 ++-
+ .../gstreamer/GStreamerVideoFrameConverter.cpp    | 15 ++++++++++++++-
+ .../gstreamer/GStreamerVideoFrameConverter.h      | 12 +++++++++++-
+ .../gstreamer/GStreamerVideoSinkCommon.cpp        |  4 ++++
+ .../gstreamer/MediaPlayerPrivateGStreamer.cpp     | 13 ++++++++++++-
+ .../gstreamer/MediaPlayerPrivateGStreamer.h       |  8 ++++++++
+ .../gstreamer/PlatformDisplayGStreamer.cpp        |  6 ++++--
+ .../graphics/gstreamer/VideoEncoderGStreamer.cpp  |  5 ++++-
+ .../CoordinatedPlatformLayerBufferVideo.cpp       | 10 ++++++++++
+ .../CoordinatedPlatformLayerBufferVideo.h         |  2 ++
+ Source/cmake/GStreamerChecks.cmake                |  8 ++++++--
+ Source/cmake/GStreamerDefinitions.cmake           |  1 +
+ Source/cmake/GStreamerDependencies.cmake          |  1 +
+ 21 files changed, 117 insertions(+), 23 deletions(-)
+
+diff --git a/Source/WebCore/platform/GStreamer.cmake b/Source/WebCore/platform/GStreamer.cmake
+index 2fd2d5c74d05..1fac82471727 100644
+--- a/Source/WebCore/platform/GStreamer.cmake
++++ b/Source/WebCore/platform/GStreamer.cmake
+@@ -75,14 +75,12 @@ endif ()
+ 
+ if (ENABLE_VIDEO)
+     list(APPEND WebCore_SYSTEM_INCLUDE_DIRECTORIES
+-        ${GSTREAMER_GL_INCLUDE_DIRS}
+         ${GSTREAMER_TAG_INCLUDE_DIRS}
+         ${GSTREAMER_VIDEO_INCLUDE_DIRS}
+     )
+ 
+     if (NOT USE_GSTREAMER_FULL)
+         list(APPEND WebCore_LIBRARIES
+-           ${GSTREAMER_GL_LIBRARIES}
+            ${GSTREAMER_TAG_LIBRARIES}
+            ${GSTREAMER_VIDEO_LIBRARIES}
+         )
+@@ -97,6 +95,15 @@ if (ENABLE_VIDEO)
+         )
+     endif ()
+ 
++    if (USE_GSTREAMER_GL AND NOT USE_GSTREAMER_FULL)
++        list(APPEND WebCore_SYSTEM_INCLUDE_DIRECTORIES
++            ${GSTREAMER_GL_INCLUDE_DIRS}
++        )
++        list(APPEND WebCore_LIBRARIES
++            ${GSTREAMER_GL_LIBRARIES}
++        )
++    endif ()
++
+     if (USE_LIBWEBRTC)
+         list(APPEND WebCore_SYSTEM_INCLUDE_DIRECTORIES
+             ${GSTREAMER_CODECPARSERS_INCLUDE_DIRS}
+diff --git a/Source/WebCore/platform/graphics/PlatformDisplay.cpp b/Source/WebCore/platform/graphics/PlatformDisplay.cpp
+index 3b46570f94bc..d646b6767bdf 100644
+--- a/Source/WebCore/platform/graphics/PlatformDisplay.cpp
++++ b/Source/WebCore/platform/graphics/PlatformDisplay.cpp
+@@ -131,7 +131,7 @@ void PlatformDisplay::clearSharingGLContext()
+ #if USE(SKIA)
+     invalidateSkiaGLContexts();
+ #endif
+-#if ENABLE(VIDEO) && USE(GSTREAMER)
++#if ENABLE(VIDEO) && USE(GSTREAMER_GL)
+     m_gstGLContext = nullptr;
+ #endif
+ #if ENABLE(WEBGL) && !PLATFORM(WIN)
+@@ -157,7 +157,7 @@ const GLDisplay::Extensions& PlatformDisplay::eglExtensions() const
+ 
+ void PlatformDisplay::terminateEGLDisplay()
+ {
+-#if ENABLE(VIDEO) && USE(GSTREAMER)
++#if ENABLE(VIDEO) && USE(GSTREAMER_GL)
+     m_gstGLDisplay = nullptr;
+ #endif
+     clearSharingGLContext();
+diff --git a/Source/WebCore/platform/graphics/PlatformDisplay.h b/Source/WebCore/platform/graphics/PlatformDisplay.h
+index 814648b91939..b11d53a11402 100644
+--- a/Source/WebCore/platform/graphics/PlatformDisplay.h
++++ b/Source/WebCore/platform/graphics/PlatformDisplay.h
+@@ -38,12 +38,12 @@ typedef void *EGLDisplay;
+ typedef void *EGLImage;
+ typedef unsigned EGLenum;
+ 
+-#if ENABLE(VIDEO) && USE(GSTREAMER)
++#if ENABLE(VIDEO) && USE(GSTREAMER_GL)
+ #include "GRefPtrGStreamer.h"
+ 
+ typedef struct _GstGLContext GstGLContext;
+ typedef struct _GstGLDisplay GstGLDisplay;
+-#endif // ENABLE(VIDEO) && USE(GSTREAMER)
++#endif // ENABLE(VIDEO) && USE(GSTREAMER_GL)
+ 
+ #if USE(SKIA)
+ WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
+@@ -109,7 +109,7 @@ public:
+     EGLContext angleSharingGLContext();
+ #endif
+ 
+-#if ENABLE(VIDEO) && USE(GSTREAMER)
++#if ENABLE(VIDEO) && USE(GSTREAMER_GL)
+     GstGLDisplay* gstGLDisplay() const;
+     GstGLContext* gstGLContext() const;
+     void clearGStreamerGLState();
+@@ -148,7 +148,7 @@ private:
+     EGLContext m_angleSharingGLContext { nullptr };
+ #endif
+ 
+-#if ENABLE(VIDEO) && USE(GSTREAMER)
++#if ENABLE(VIDEO) && USE(GSTREAMER_GL)
+     mutable GRefPtr<GstGLDisplay> m_gstGLDisplay;
+     mutable GRefPtr<GstGLContext> m_gstGLContext;
+ #endif
+diff --git a/Source/WebCore/platform/graphics/gstreamer/GLVideoSinkGStreamer.cpp b/Source/WebCore/platform/graphics/gstreamer/GLVideoSinkGStreamer.cpp
+index 8e484e91b033..12fed2ed3b21 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/GLVideoSinkGStreamer.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/GLVideoSinkGStreamer.cpp
+@@ -20,7 +20,7 @@
+ #include "config.h"
+ #include "GLVideoSinkGStreamer.h"
+ 
+-#if ENABLE(VIDEO) && USE(GSTREAMER)
++#if ENABLE(VIDEO) && USE(GSTREAMER_GL)
+ 
+ #include "GStreamerCommon.h"
+ #include "GStreamerVideoSinkCommon.h"
+diff --git a/Source/WebCore/platform/graphics/gstreamer/GLVideoSinkGStreamer.h b/Source/WebCore/platform/graphics/gstreamer/GLVideoSinkGStreamer.h
+index 837cd4eb662e..456bccacb3f8 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/GLVideoSinkGStreamer.h
++++ b/Source/WebCore/platform/graphics/gstreamer/GLVideoSinkGStreamer.h
+@@ -18,7 +18,7 @@
+ 
+ #pragma once
+ 
+-#if ENABLE(VIDEO) && USE(GSTREAMER)
++#if ENABLE(VIDEO) && USE(GSTREAMER_GL)
+ 
+ #include <gst/gst.h>
+ 
+@@ -55,4 +55,4 @@ void webKitGLVideoSinkSetMediaPlayerPrivate(WebKitGLVideoSink*, WebCore::MediaPl
+ 
+ G_END_DECLS
+ 
+-#endif // ENABLE(VIDEO) && USE(GSTREAMER)
++#endif // ENABLE(VIDEO) && USE(GSTREAMER_GL)
+diff --git a/Source/WebCore/platform/graphics/gstreamer/GRefPtrGStreamer.cpp b/Source/WebCore/platform/graphics/gstreamer/GRefPtrGStreamer.cpp
+index 87a606bafd91..efbb9db718fc 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/GRefPtrGStreamer.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/GRefPtrGStreamer.cpp
+@@ -21,9 +21,12 @@
+ #include "GRefPtrGStreamer.h"
+ 
+ #if USE(GSTREAMER)
+-#include <gst/gl/egl/gsteglimage.h>
+ #include <gst/gst.h>
+ 
++#if USE(GSTREAMER_GL)
++#include <gst/gl/egl/gsteglimage.h>
++#endif
++
+ #if USE(GSTREAMER_WEBRTC)
+ #include <gst/rtp/rtp.h>
+ #define GST_USE_UNSTABLE_API
+@@ -638,6 +641,8 @@ template <> void derefGPtr<WebKitWebSrc>(WebKitWebSrc* ptr)
+         gst_object_unref(GST_OBJECT(ptr));
+ }
+ 
++#if USE(GSTREAMER_GL)
++
+ template<> GRefPtr<GstGLDisplay> adoptGRef(GstGLDisplay* ptr)
+ {
+     ASSERT(!ptr || !g_object_is_floating(ptr));
+@@ -716,6 +721,8 @@ template<> void derefGPtr<GstGLColorConvert>(GstGLColorConvert* ptr)
+         gst_object_unref(GST_OBJECT(ptr));
+ }
+ 
++#endif // USE(GSTREAMER_GL)
++
+ template <>
+ GRefPtr<GstEncodingProfile> adoptGRef(GstEncodingProfile* ptr)
+ {
+diff --git a/Source/WebCore/platform/graphics/gstreamer/GRefPtrGStreamer.h b/Source/WebCore/platform/graphics/gstreamer/GRefPtrGStreamer.h
+index 18bbb71cc41f..47988226c0e6 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/GRefPtrGStreamer.h
++++ b/Source/WebCore/platform/graphics/gstreamer/GRefPtrGStreamer.h
+@@ -30,10 +30,12 @@ typedef struct _WebKitVideoSink WebKitVideoSink;
+ struct WebKitWebSrc;
+ typedef struct _GstBaseSink GstBaseSink;
+ 
++#if USE(GSTREAMER_GL)
+ typedef struct _GstGLDisplay GstGLDisplay;
+ typedef struct _GstGLContext GstGLContext;
+ typedef struct _GstEGLImage GstEGLImage;
+ typedef struct _GstGLColorConvert GstGLColorConvert;
++#endif
+ 
+ #if USE(GSTREAMER_WEBRTC)
+ typedef struct _GstPromise GstPromise;
+@@ -175,6 +177,7 @@ template<> GRefPtr<GstTracer> adoptGRef(GstTracer*);
+ template<> GstTracer* refGPtr<GstTracer>(GstTracer*);
+ template<> void derefGPtr<GstTracer>(GstTracer*);
+ 
++#if USE(GSTREAMER_GL)
+ template<> GRefPtr<GstGLDisplay> adoptGRef(GstGLDisplay* ptr);
+ template<> GstGLDisplay* refGPtr<GstGLDisplay>(GstGLDisplay* ptr);
+ template<> void derefGPtr<GstGLDisplay>(GstGLDisplay* ptr);
+@@ -191,6 +194,8 @@ template<> GRefPtr<GstGLColorConvert> adoptGRef(GstGLColorConvert* ptr);
+ template<> GstGLColorConvert* refGPtr<GstGLColorConvert>(GstGLColorConvert* ptr);
+ template<> void derefGPtr<GstGLColorConvert>(GstGLColorConvert* ptr);
+ 
++#endif
++
+ template<> GRefPtr<GstEncodingProfile> adoptGRef(GstEncodingProfile*);
+ template<> GstEncodingProfile* refGPtr<GstEncodingProfile>(GstEncodingProfile*);
+ template<> void derefGPtr<GstEncodingProfile>(GstEncodingProfile*);
+diff --git a/Source/WebCore/platform/graphics/gstreamer/GStreamerCommon.cpp b/Source/WebCore/platform/graphics/gstreamer/GStreamerCommon.cpp
+index e06669c875cb..9a4a33642f12 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/GStreamerCommon.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/GStreamerCommon.cpp
+@@ -453,8 +453,10 @@ void registerWebKitGStreamerElements()
+ 
+ #if ENABLE(VIDEO)
+         gst_element_register(0, "webkitwebsrc", GST_RANK_PRIMARY + 100, WEBKIT_TYPE_WEB_SRC);
+-        gst_element_register(0, "webkitglvideosink", GST_RANK_NONE, WEBKIT_TYPE_GL_VIDEO_SINK);
+         gst_element_register(0, "webkitvideosink", GST_RANK_NONE, WEBKIT_TYPE_VIDEO_SINK);
++#if USE(GSTREAMER_GL)
++        gst_element_register(0, "webkitglvideosink", GST_RANK_NONE, WEBKIT_TYPE_GL_VIDEO_SINK);
++#endif
+ #endif
+         // We don't want autoaudiosink to autoplug our sink.
+         gst_element_register(0, "webkitaudiosink", GST_RANK_NONE, WEBKIT_TYPE_AUDIO_SINK);
+@@ -616,9 +618,10 @@ void WebCoreLogObserver::removeWatch(const Logger& logger)
+ 
+ void deinitializeGStreamer()
+ {
++#if USE(GSTREAMER_GL)
+     if (auto* sharedDisplay = PlatformDisplay::sharedDisplayIfExists())
+         sharedDisplay->clearGStreamerGLState();
+-
++#endif
+ #if ENABLE(MEDIA_STREAM)
+     teardownGStreamerCaptureDeviceManagers();
+ #endif
+@@ -1897,6 +1900,7 @@ GRefPtr<GstCaps> buildDMABufCaps()
+ }
+ #endif // USE(GBM)
+ 
++#if USE(GSTREAMER_GL)
+ static std::optional<GRefPtr<GstContext>> requestGLContext(const char* contextType)
+ {
+     auto& sharedDisplay = PlatformDisplay::sharedDisplay();
+@@ -1933,6 +1937,7 @@ bool setGstElementGLContext(GstElement* element, const char* contextType)
+     }
+     return true;
+ }
++#endif
+ 
+ #undef GST_CAT_DEFAULT
+ 
+diff --git a/Source/WebCore/platform/graphics/gstreamer/GStreamerCommon.h b/Source/WebCore/platform/graphics/gstreamer/GStreamerCommon.h
+index 42e82d0d75b4..f332ddd0e040 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/GStreamerCommon.h
++++ b/Source/WebCore/platform/graphics/gstreamer/GStreamerCommon.h
+@@ -360,8 +360,9 @@ void gstStructureFilterAndMapInPlace(GstStructure*, Function<bool(GstId, GValue*
+ WARN_UNUSED_RETURN GRefPtr<GstCaps> buildDMABufCaps();
+ #endif
+ 
++#if USE(GSTREAMER_GL)
+ bool setGstElementGLContext(GstElement*, const char* contextType);
+-
++#endif
+ } // namespace WebCore
+ 
+ #ifndef GST_BUFFER_DTS_OR_PTS
+diff --git a/Source/WebCore/platform/graphics/gstreamer/GStreamerVideoFrameConverter.cpp b/Source/WebCore/platform/graphics/gstreamer/GStreamerVideoFrameConverter.cpp
+index de733ecefae1..99aa21e107c8 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/GStreamerVideoFrameConverter.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/GStreamerVideoFrameConverter.cpp
+@@ -26,12 +26,15 @@
+ #include <gst/allocators/gstdmabuf.h>
+ #include <gst/app/gstappsink.h>
+ #include <gst/app/gstappsrc.h>
+-#include <gst/gl/gl.h>
+ #include <wtf/NeverDestroyed.h>
+ #include <wtf/Scope.h>
+ #include <wtf/TZoneMallocInlines.h>
+ #include <wtf/glib/RunLoopSourcePriority.h>
+ 
++#if USE(GSTREAMER_GL)
++#include <gst/gl/gl.h>
++#endif
++
+ namespace WebCore {
+ 
+ WTF_MAKE_TZONE_ALLOCATED_IMPL(GStreamerVideoFrameConverter);
+@@ -57,6 +60,7 @@ GStreamerVideoFrameConverter::Pipeline::Pipeline(Type type)
+         gst_element_link_many(m_src.get(), videoconvert, videoscale, m_sink.get(), nullptr);
+         break;
+     }
++#if USE(GSTREAMER_GL)
+     case Type::GLMemory: {
+         auto glcolorconvert = makeGStreamerElement("glcolorconvert", nullptr);
+         auto gldownload = makeGStreamerElement("gldownload", nullptr);
+@@ -76,6 +80,7 @@ GStreamerVideoFrameConverter::Pipeline::Pipeline(Type type)
+         gst_bin_add_many(GST_BIN_CAST(m_pipeline.get()), m_src.get(), glupload, m_capsfilter.get(), glcolorconvert, gldownload, videoscale, m_sink.get(), nullptr);
+         gst_element_link_many(m_src.get(), glupload, m_capsfilter.get(), glcolorconvert, gldownload, videoscale, m_sink.get(), nullptr);
+     }
++#endif
+     }
+ }
+ 
+@@ -83,6 +88,7 @@ GStreamerVideoFrameConverter::Pipeline::~Pipeline() = default;
+ 
+ GRefPtr<GstSample> GStreamerVideoFrameConverter::Pipeline::run(const GRefPtr<GstSample>& sample, GstCaps* destinationCaps)
+ {
++#if USE(GSTREAMER_GL)
+     if (m_type == Type::GLMemory || m_type == Type::DMABufMemory) {
+         if (!setGstElementGLContext(m_pipeline.get(), GST_GL_DISPLAY_CONTEXT_TYPE))
+             return nullptr;
+@@ -96,6 +102,7 @@ GRefPtr<GstSample> GStreamerVideoFrameConverter::Pipeline::run(const GRefPtr<Gst
+             g_object_set(m_capsfilter.get(), "caps", outputCaps.get(), nullptr);
+         }
+     }
++#endif
+ 
+     unsigned capsSize = gst_caps_get_size(destinationCaps);
+     auto newCaps = adoptGRef(gst_caps_new_empty());
+@@ -145,6 +152,7 @@ GStreamerVideoFrameConverter::GStreamerVideoFrameConverter()
+ 
+ GStreamerVideoFrameConverter::Pipeline& GStreamerVideoFrameConverter::ensurePipeline(GstCaps* caps)
+ {
++#if USE(GSTREAMER_GL)
+     auto* features = gst_caps_get_features(caps, 0);
+     if (features && gst_caps_features_contains(features, GST_CAPS_FEATURE_MEMORY_DMABUF)) {
+         if (!m_dmabufMemoryPipeline) {
+@@ -165,6 +173,9 @@ GStreamerVideoFrameConverter::Pipeline& GStreamerVideoFrameConverter::ensurePipe
+         m_releaseUnusedGLMemoryPipelineTimer->startOneShot(s_releaseUnusedPipelinesTimerInterval);
+         return *m_glMemoryPipeline;
+     }
++#else
++    UNUSED_PARAM(caps);
++#endif
+ 
+     if (!m_systemMemoryPipeline) {
+         m_systemMemoryPipeline = makeUnique<Pipeline>(Pipeline::Type::SystemMemory);
+@@ -216,6 +227,7 @@ void GStreamerVideoFrameConverter::releaseUnusedSystemMemoryPipelineTimerFired()
+     m_releaseUnusedSystemMemoryPipelineTimer = nullptr;
+ }
+ 
++#if USE(GSTREAMER_GL)
+ void GStreamerVideoFrameConverter::releaseUnusedGLMemoryPipelineTimerFired()
+ {
+     m_glMemoryPipeline = nullptr;
+@@ -227,6 +239,7 @@ void GStreamerVideoFrameConverter::releaseUnusedDMABufMemoryPipelineTimerFired()
+     m_dmabufMemoryPipeline = nullptr;
+     m_releaseUnusedDMABufMemoryPipelineTimer = nullptr;
+ }
++#endif
+ 
+ #undef GST_CAT_DEFAULT
+ 
+diff --git a/Source/WebCore/platform/graphics/gstreamer/GStreamerVideoFrameConverter.h b/Source/WebCore/platform/graphics/gstreamer/GStreamerVideoFrameConverter.h
+index 15d97be0d307..a53d01c588b7 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/GStreamerVideoFrameConverter.h
++++ b/Source/WebCore/platform/graphics/gstreamer/GStreamerVideoFrameConverter.h
+@@ -45,7 +45,13 @@ private:
+     class Pipeline {
+         WTF_MAKE_TZONE_ALLOCATED(Pipeline);
+     public:
+-        enum class Type : uint8_t { SystemMemory, GLMemory, DMABufMemory };
++        enum class Type : uint8_t {
++            SystemMemory,
++#if USE(GSTREAMER_GL)
++            GLMemory,
++            DMABufMemory
++#endif
++        };
+         Pipeline(Type);
+         ~Pipeline();
+ 
+@@ -61,15 +67,19 @@ private:
+ 
+     Pipeline& ensurePipeline(GstCaps*);
+     void releaseUnusedSystemMemoryPipelineTimerFired();
++#if USE(GSTREAMER_GL)
+     void releaseUnusedGLMemoryPipelineTimerFired();
+     void releaseUnusedDMABufMemoryPipelineTimerFired();
++#endif
+ 
+     std::unique_ptr<Pipeline> m_systemMemoryPipeline;
+     std::unique_ptr<RunLoop::Timer> m_releaseUnusedSystemMemoryPipelineTimer;
++#if USE(GSTREAMER_GL)
+     std::unique_ptr<Pipeline> m_glMemoryPipeline;
+     std::unique_ptr<RunLoop::Timer> m_releaseUnusedGLMemoryPipelineTimer;
+     std::unique_ptr<Pipeline> m_dmabufMemoryPipeline;
+     std::unique_ptr<RunLoop::Timer> m_releaseUnusedDMABufMemoryPipelineTimer;
++#endif
+ };
+ 
+ } // namespace WebCore
+diff --git a/Source/WebCore/platform/graphics/gstreamer/GStreamerVideoSinkCommon.cpp b/Source/WebCore/platform/graphics/gstreamer/GStreamerVideoSinkCommon.cpp
+index 89a620976e1d..49062e57d70b 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/GStreamerVideoSinkCommon.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/GStreamerVideoSinkCommon.cpp
+@@ -55,8 +55,10 @@ public:
+                     GST_DEBUG_OBJECT(pad, "FLUSH_START received, aborting all pending tasks in the player sinkTaskQueue.");
+                     self->m_isFlushing = true;
+                     player->sinkTaskQueue().startAborting();
++#if USE(GSTREAMER_GL)
+                     GST_DEBUG_OBJECT(pad, "Flushing current buffer in response to %" GST_PTR_FORMAT, info->data);
+                     player->flushCurrentBuffer();
++#endif
+                 } else
+                     GST_DEBUG_OBJECT(pad, "Received FLUSH_START while already flushing, ignoring.");
+             } else if (GST_EVENT_TYPE(GST_PAD_PROBE_INFO_EVENT(info)) == GST_EVENT_FLUSH_STOP) {
+@@ -106,6 +108,7 @@ public:
+             gst_query_add_allocation_pool(query, nullptr, size, 3, 0);
+         }
+ 
++#if USE(GSTREAMER_GL)
+         // In some platforms (e.g. OpenMAX on the Raspberry Pi) when a resolution change occurs the
+         // pipeline has to be drained before a frame with the new resolution can be decoded.
+         // In this context, it's important that we don't hold references to any previous frame
+@@ -115,6 +118,7 @@ public:
+             GST_DEBUG_OBJECT(pad, "Flushing current buffer in response to %" GST_PTR_FORMAT, info->data);
+             player->flushCurrentBuffer();
+         }
++#endif
+ 
+         return GST_PAD_PROBE_OK;
+     }
+diff --git a/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp b/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
+index 3ae35335991f..80fdb52a342c 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
+@@ -30,7 +30,6 @@
+ #if ENABLE(VIDEO) && USE(GSTREAMER)
+ 
+ #include "AudioTrackPrivateGStreamer.h"
+-#include "GLVideoSinkGStreamer.h"
+ #include "GStreamerAudioMixer.h"
+ #include "GStreamerCommon.h"
+ #include "GStreamerQuirks.h"
+@@ -110,6 +109,10 @@
+ #undef GST_USE_UNSTABLE_API
+ #endif // ENABLE(VIDEO) && USE(GSTREAMER_MPEGTS)
+ 
++#if USE(GSTREAMER_GL)
++#include "GLVideoSinkGStreamer.h"
++#endif // USE(GSTREAMER_GL)
++
+ #if USE(COORDINATED_GRAPHICS)
+ #include "BitmapTexture.h"
+ #include "BitmapTexturePool.h"
+@@ -234,8 +237,10 @@ void MediaPlayerPrivateGStreamer::tearDown(bool clearMediaPlayer)
+         g_signal_handlers_disconnect_matched(videoSinkPad.get(), G_SIGNAL_MATCH_DATA, 0, 0, nullptr, nullptr, this);
+     }
+ 
++#if USE(GSTREAMER_GL)
+     if (m_videoDecoderPlatform == GstVideoDecoderPlatform::Video4Linux)
+         flushCurrentBuffer();
++#endif
+ 
+     if (m_videoSink)
+         g_signal_handlers_disconnect_matched(m_videoSink.get(), G_SIGNAL_MATCH_DATA, 0, 0, nullptr, nullptr, this);
+@@ -3810,6 +3815,7 @@ void MediaPlayerPrivateGStreamer::repaintCancelledCallback(MediaPlayerPrivateGSt
+     player->cancelRepaint();
+ }
+ 
++#if USE(GSTREAMER_GL)
+ void MediaPlayerPrivateGStreamer::flushCurrentBuffer()
+ {
+     Locker sampleLocker { m_sampleMutex };
+@@ -3831,6 +3837,7 @@ void MediaPlayerPrivateGStreamer::flushCurrentBuffer()
+     m_contentsBufferProxy->dropCurrentBufferWhilePreservingTexture(shouldWait);
+ #endif
+ }
++#endif
+ 
+ void MediaPlayerPrivateGStreamer::setVisibleInViewport(bool isVisible)
+ {
+@@ -3979,6 +3986,7 @@ MediaPlayer::MovieLoadType MediaPlayerPrivateGStreamer::movieLoadType() const
+     return MediaPlayer::MovieLoadType::Download;
+ }
+ 
++#if USE(GSTREAMER_GL)
+ GstElement* MediaPlayerPrivateGStreamer::createVideoSinkGL()
+ {
+     const char* disableGLSink = g_getenv("WEBKIT_GST_DISABLE_GL_SINK");
+@@ -4002,6 +4010,7 @@ GstElement* MediaPlayerPrivateGStreamer::createVideoSinkGL()
+ 
+     return sink;
+ }
++#endif // USE(GSTREAMER_GL)
+ 
+ bool MediaPlayerPrivateGStreamer::isHolePunchRenderingEnabled() const
+ {
+@@ -4095,8 +4104,10 @@ GstElement* MediaPlayerPrivateGStreamer::createVideoSink()
+         return m_videoSink.get();
+     }
+ 
++#if USE(GSTREAMER_GL)
+     if (!m_videoSink && m_canRenderingBeAccelerated)
+         m_videoSink = createVideoSinkGL();
++#endif
+ 
+     if (!m_videoSink) {
+         m_isUsingFallbackVideoSink = true;
+diff --git a/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.h b/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.h
+index e38a9cbc7c2b..5cf93b9cb5a6 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.h
++++ b/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.h
+@@ -60,9 +60,13 @@
+ 
+ typedef struct _GstMpegtsSection GstMpegtsSection;
+ 
++#if USE(GSTREAMER_GL)
+ // Include the <epoxy/gl.h> header before <gst/gl/gl.h>.
+ #include <epoxy/gl.h>
++#define GST_USE_UNSTABLE_API
+ #include <gst/gl/gl.h>
++#undef GST_USE_UNSTABLE_API
++#endif
+ 
+ #if ENABLE(ENCRYPTED_MEDIA)
+ #include "CDMProxy.h"
+@@ -209,7 +213,9 @@ public:
+     void handleMessage(GstMessage*);
+ 
+     void triggerRepaint(GRefPtr<GstSample>&&);
++#if USE(GSTREAMER_GL)
+     void flushCurrentBuffer();
++#endif
+ 
+     void handleTextSample(GRefPtr<GstSample>&&, TrackID streamId);
+ 
+@@ -296,7 +302,9 @@ protected:
+     void pushNextHolePunchBuffer();
+     bool shouldIgnoreIntrinsicSize() final;
+ 
++#if USE(GSTREAMER_GL)
+     GstElement* createVideoSinkGL();
++#endif
+ 
+ #if USE(COORDINATED_GRAPHICS)
+     void pushTextureToCompositor(bool isDuplicateSample);
+diff --git a/Source/WebCore/platform/graphics/gstreamer/PlatformDisplayGStreamer.cpp b/Source/WebCore/platform/graphics/gstreamer/PlatformDisplayGStreamer.cpp
+index 9f904078c6ba..ae40ebcff2d0 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/PlatformDisplayGStreamer.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/PlatformDisplayGStreamer.cpp
+@@ -20,14 +20,16 @@
+ #include "config.h"
+ #include "PlatformDisplay.h"
+ 
+-#if USE(GSTREAMER)
++#if USE(GSTREAMER_GL)
+ 
+ #include "GLContext.h"
+ #include "GStreamerCommon.h"
++#define GST_USE_UNSTABLE_API
+ #include <gst/gl/gl.h>
+ #if GST_GL_HAVE_PLATFORM_EGL
+ #include <gst/gl/egl/gstgldisplay_egl.h>
+ #endif
++#undef GST_USE_UNSTABLE_API
+ #include <wtf/glib/GUniquePtr.h>
+ 
+ GST_DEBUG_CATEGORY(webkit_display_debug);
+@@ -95,4 +97,4 @@ void PlatformDisplay::clearGStreamerGLState()
+ 
+ #undef GST_CAT_DEFAULT
+ 
+-#endif // USE(GSTREAMER)
++#endif // USE(GSTREAMER_GL)
+diff --git a/Source/WebCore/platform/graphics/gstreamer/VideoEncoderGStreamer.cpp b/Source/WebCore/platform/graphics/gstreamer/VideoEncoderGStreamer.cpp
+index e4403a403182..7ed75896a4ae 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/VideoEncoderGStreamer.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/VideoEncoderGStreamer.cpp
+@@ -27,13 +27,16 @@
+ #include "GStreamerRegistryScanner.h"
+ #include "VideoEncoderPrivateGStreamer.h"
+ #include "VideoFrameGStreamer.h"
+-#include <gst/gl/gstglmemory.h>
+ #include <wtf/NeverDestroyed.h>
+ #include <wtf/TZoneMallocInlines.h>
+ #include <wtf/ThreadSafeRefCounted.h>
+ #include <wtf/WorkQueue.h>
+ #include <wtf/text/MakeString.h>
+ 
++#if USE(GSTREAMER_GL)
++#include <gst/gl/gstglmemory.h>
++#endif
++
+ namespace WebCore {
+ 
+ WTF_MAKE_TZONE_ALLOCATED_IMPL(GStreamerVideoEncoder);
+diff --git a/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.cpp b/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.cpp
+index f53eafe31612..683b37655ef0 100644
+--- a/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.cpp
++++ b/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.cpp
+@@ -33,9 +33,11 @@
+ #include "CoordinatedPlatformLayerBufferYUV.h"
+ #include "TextureMapper.h"
+ 
++#if USE(GSTREAMER_GL)
+ // Include the <epoxy/gl.h> header before <gst/gl/gl.h>.
+ #include <epoxy/gl.h>
+ #include <gst/gl/gl.h>
++#endif
+ 
+ #if USE(GBM)
+ #include "CoordinatedPlatformLayerBufferDMABuf.h"
+@@ -93,8 +95,12 @@ std::unique_ptr<CoordinatedPlatformLayerBuffer> CoordinatedPlatformLayerBufferVi
+     UNUSED_PARAM(dmabufFormat);
+ #endif
+ 
++#if USE(GSTREAMER_GL)
+     if (gstGLEnabled && gst_is_gl_memory(gst_buffer_peek_memory(buffer, 0)))
+         return createBufferFromGLMemory(buffer, videoInfo);
++#else
++    UNUSED_PARAM(gstGLEnabled);
++#endif
+ 
+     // When not having a texture, we map the frame here and upload the pixels to a texture in the
+     // compositor thread, in paintToTextureMapper(), which also allows us to use the texture mapper
+@@ -193,6 +199,7 @@ std::unique_ptr<CoordinatedPlatformLayerBuffer> CoordinatedPlatformLayerBufferVi
+ }
+ #endif // USE(GBM)
+ 
++#if USE(GSTREAMER_GL)
+ std::unique_ptr<CoordinatedPlatformLayerBuffer> CoordinatedPlatformLayerBufferVideo::createBufferFromGLMemory(GstBuffer* buffer, GstVideoInfo* videoInfo)
+ {
+     m_isMapped = gst_video_frame_map(&m_videoFrame, videoInfo, buffer, static_cast<GstMapFlags>(GST_MAP_READ | GST_MAP_GL));
+@@ -244,10 +251,12 @@ std::unique_ptr<CoordinatedPlatformLayerBuffer> CoordinatedPlatformLayerBufferVi
+ 
+     return nullptr;
+ }
++#endif
+ 
+ void CoordinatedPlatformLayerBufferVideo::paintToTextureMapper(TextureMapper& textureMapper, const FloatRect& targetRect, const TransformationMatrix& modelViewMatrix, float opacity)
+ {
+     if (m_isMapped) {
++#if USE(GSTREAMER_GL)
+         if (m_videoDecoderPlatform != GstVideoDecoderPlatform::OpenMAX) {
+             if (auto* meta = gst_buffer_get_gl_sync_meta(m_videoFrame.buffer)) {
+                 GstMemory* memory = gst_buffer_peek_memory(m_videoFrame.buffer, 0);
+@@ -255,6 +264,7 @@ void CoordinatedPlatformLayerBufferVideo::paintToTextureMapper(TextureMapper& te
+                 gst_gl_sync_meta_wait_cpu(meta, context);
+             }
+         }
++#endif
+ 
+         if (!m_buffer) {
+             OptionSet<BitmapTexture::Flags> textureFlags;
+diff --git a/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.h b/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.h
+index 4d5d8fb71d88..c2d12367f886 100644
+--- a/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.h
++++ b/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.h
+@@ -48,7 +48,9 @@ private:
+ #if USE(GBM)
+     std::unique_ptr<CoordinatedPlatformLayerBuffer> createBufferFromDMABufMemory(GstBuffer*, GstVideoInfo*, std::optional<std::pair<uint32_t, uint64_t>>);
+ #endif
++#if USE(GSTREAMER_GL)
+     std::unique_ptr<CoordinatedPlatformLayerBuffer> createBufferFromGLMemory(GstBuffer*, GstVideoInfo*);
++#endif
+ 
+     GstVideoFrame m_videoFrame;
+     std::optional<GstVideoDecoderPlatform> m_videoDecoderPlatform;
+diff --git a/Source/cmake/GStreamerChecks.cmake b/Source/cmake/GStreamerChecks.cmake
+index 936cf99d8167..27816a97ff26 100644
+--- a/Source/cmake/GStreamerChecks.cmake
++++ b/Source/cmake/GStreamerChecks.cmake
+@@ -34,8 +34,8 @@ if (ENABLE_VIDEO OR ENABLE_WEB_AUDIO OR ENABLE_WEB_CODECS)
+           endif ()
+ 
+           if (ENABLE_VIDEO)
+-              if (NOT PC_GSTREAMER_APP_FOUND OR NOT PC_GSTREAMER_PBUTILS_FOUND OR NOT PC_GSTREAMER_TAG_FOUND OR NOT PC_GSTREAMER_VIDEO_FOUND OR NOT PC_GSTREAMER_GL_FOUND)
+-                  message(FATAL_ERROR "Video playback requires the following GStreamer libraries: app, gl, pbutils, tag, video. Please check your gst-plugins-base installation.")
++              if (NOT PC_GSTREAMER_APP_FOUND OR NOT PC_GSTREAMER_PBUTILS_FOUND OR NOT PC_GSTREAMER_TAG_FOUND OR NOT PC_GSTREAMER_VIDEO_FOUND)
++                  message(FATAL_ERROR "Video playback requires the following GStreamer libraries: app, pbutils, tag, video. Please check your gst-plugins-base installation.")
+               endif ()
+           endif ()
+ 
+@@ -43,6 +43,10 @@ if (ENABLE_VIDEO OR ENABLE_WEB_AUDIO OR ENABLE_WEB_CODECS)
+               message(FATAL_ERROR "GStreamer MPEG-TS is needed for USE_GSTREAMER_MPEGTS.")
+           endif ()
+ 
++          if (USE_GSTREAMER_GL AND NOT PC_GSTREAMER_GL_FOUND)
++              message(FATAL_ERROR "GStreamerGL is needed for USE_GSTREAMER_GL.")
++          endif ()
++
+           if (ENABLE_MEDIA_RECORDER AND USE_GSTREAMER_TRANSCODER AND (NOT PC_GSTREAMER_TRANSCODER_FOUND OR PC_GSTREAMER_TRANSCODER_VERSION VERSION_LESS "1.20"))
+               message(FATAL_ERROR "GStreamerTranscoder >= 1.20 is needed for USE_GSTREAMER_TRANSCODER.")
+           endif ()
+diff --git a/Source/cmake/GStreamerDefinitions.cmake b/Source/cmake/GStreamerDefinitions.cmake
+index 06b17ea39505..262ed7d6aade 100644
+--- a/Source/cmake/GStreamerDefinitions.cmake
++++ b/Source/cmake/GStreamerDefinitions.cmake
+@@ -3,6 +3,7 @@ WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_WEB_AUDIO PUBLIC ON)
+ 
+ WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_MEDIA_SOURCE PRIVATE ON)
+ 
++WEBKIT_OPTION_DEFINE(USE_GSTREAMER_GL "Whether to enable support for GStreamer GL" PRIVATE ON)
+ WEBKIT_OPTION_DEFINE(USE_GSTREAMER_MPEGTS "Whether to enable support for MPEG-TS" PRIVATE OFF)
+ WEBKIT_OPTION_DEFINE(USE_GSTREAMER_FULL "Whether to enable support for static GStreamer builds" PRIVATE OFF)
+ WEBKIT_OPTION_DEFINE(USE_GSTREAMER_TRANSCODER "Whether to enable support for GStreamer MediaRecorder backend" PUBLIC ON)
+diff --git a/Source/cmake/GStreamerDependencies.cmake b/Source/cmake/GStreamerDependencies.cmake
+index 0d053ca8357c..399819f44fdc 100644
+--- a/Source/cmake/GStreamerDependencies.cmake
++++ b/Source/cmake/GStreamerDependencies.cmake
+@@ -1,3 +1,4 @@
++WEBKIT_OPTION_DEPEND(USE_GSTREAMER_GL ENABLE_VIDEO)
+ WEBKIT_OPTION_DEPEND(USE_GSTREAMER_MPEGTS ENABLE_VIDEO)
+ WEBKIT_OPTION_DEPEND(USE_GSTREAMER_TRANSCODER ENABLE_MEDIA_RECORDER)
+ WEBKIT_OPTION_DEPEND(USE_GSTREAMER_WEBRTC ENABLE_WEB_RTC)
+-- 
+2.43.0
+

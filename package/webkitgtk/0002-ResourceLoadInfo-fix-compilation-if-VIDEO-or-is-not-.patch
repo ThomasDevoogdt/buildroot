@@ -1,0 +1,45 @@
+From e8f8aba6ab067a8186b8c5b6e67c89af6c14afa5 Mon Sep 17 00:00:00 2001
+From: Thomas Devoogdt <thomas@devoogdt.com>
+Date: Sat, 22 Mar 2025 18:11:16 +0100
+Subject: [PATCH] ResourceLoadInfo: fix compilation if VIDEO or is not enabled
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+https://bugs.webkit.org/show_bug.cgi?id=290259
+
+Reviewed by NOBODY (OOPS!).
+
+/home/thomas/br-test-pkg/bootlin-armv7-glibc/build/webkitgtk-2.48.0/Source/WebCore/loader/ResourceLoadInfo.cpp:88:32: error: ‘TextTrackResource’ is not a member of ‘WebCore::CachedResource::Type’
+   88 |     case CachedResource::Type::TextTrackResource:
+      |                                ^~~~~~~~~~~~~~~~~
+
+Commit https://github.com/WebKit/WebKit/commit/951a118e17cd92adc3aa31129af7cd348fac91e9
+"Fix missing includes and guards when certain features are disabled",
+added guards to TextTrackResource in CachedResource, but forgot to
+add this one.
+
+Upstream: https://github.com/WebKit/WebKit/pull/42881
+Signed-off-by: Thomas Devoogdt <thomas@devoogdt.com>
+---
+ Source/WebCore/loader/ResourceLoadInfo.cpp | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/Source/WebCore/loader/ResourceLoadInfo.cpp b/Source/WebCore/loader/ResourceLoadInfo.cpp
+index 9b0a072a6d5c..5672a47db7b6 100644
+--- a/Source/WebCore/loader/ResourceLoadInfo.cpp
++++ b/Source/WebCore/loader/ResourceLoadInfo.cpp
+@@ -85,8 +85,10 @@ OptionSet<ResourceType> toResourceType(CachedResource::Type type, ResourceReques
+ #endif
+         return { ResourceType::Other };
+ 
++#if ENABLE(VIDEO)
+     case CachedResource::Type::TextTrackResource:
+         return { ResourceType::Media };
++#endif
+ 
+     };
+     ASSERT_NOT_REACHED();
+-- 
+2.43.0
+
