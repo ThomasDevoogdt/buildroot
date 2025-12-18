@@ -40,6 +40,7 @@ ifeq ($(BR2_PACKAGE_MESA3D_LLVM),y)
 MESA3D_DEPENDENCIES += host-llvm llvm
 MESA3D_MESON_EXTRA_BINARIES += llvm-config='$(STAGING_DIR)/usr/bin/llvm-config'
 MESA3D_CONF_OPTS += -Dllvm=enabled
+HOST_MESA3D_CONF_ENV += LLVM_CONFIG="$(HOST_DIR)/bin/llvm-config"
 ifeq ($(BR2_PACKAGE_LLVM_RTTI),y)
 MESA3D_CONF_OPTS += -Dcpp_rtti=true
 else
