@@ -77,6 +77,13 @@ typical packages will therefore only use a few of them.
   is not at the root of the tree extracted by the tarball. If
   +HOST_FOO_SUBDIR+ is not specified, it defaults to +FOO_SUBDIR+.
 
+* +FOO_CARGO_LOCK_VERSION+ defaults to +1+ when a +Cargo.lock+ file is
+  provided in the Buildroot package directory (next to the +.mk+ file).
+  Only set this explicitly if you need to increment it (to +2+, +3+,
+  etc.) when updating the +Cargo.lock+ without bumping +FOO_VERSION+.
+  When +FOO_VERSION+ is bumped, remove this variable to let it default
+  back to +1+.
+
 * +FOO_CARGO_ENV+ can be used to pass additional variables in the
   environment of +cargo+ invocations. It used at both build and
   installation time
@@ -94,8 +101,26 @@ step of packages that use the +cargo-package+ infrastructure. Such
 dependencies are then kept together with the package source code in
 the tarball cached in Buildroot's +DL_DIR+, and therefore the hash of
 the package's tarball doesn't only cover the source of the package
-itself, but also covers the sources of the dependencies. Thus, a change
-injected into one of the dependencies will also be discovered by the
-hash check. In addition,  this mechanism allows the build to be
-performed completely offline since cargo will not do any downloads
-during the build. This mechanism is called vendoring the dependencies.
+itself, but also covers the sources of the dependencies. In addition,
+this mechanism allows the build to be performed completely offline
+since cargo will not do any downloads during the build. This mechanism
+is called vendoring the dependencies.
+
+==== Pre-vendoring with +Cargo.lock+
+
+In some cases, you may need to provide a custom +Cargo.lock+ file in
+Buildroot (e.g., when the upstream package doesn't provide one, or you
+need to pin specific dependency versions). To do this, place a
++Cargo.lock+ file in the package directory (next to the +.mk+ file).
+Buildroot will automatically detect and use it during vendoring.
+
+When you update the +Cargo.lock+ without bumping +FOO_VERSION+, you must
+increment +FOO_CARGO_LOCK_VERSION+:
+
+----
+FOO_CARGO_LOCK_VERSION = 2
+----
+
+Increment it for each subsequent +Cargo.lock+ change (+3+, +4+, etc.).
+When +FOO_VERSION+ is bumped, remove this variable to let it default
+back to +1+.

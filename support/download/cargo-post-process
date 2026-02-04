@@ -11,11 +11,12 @@ if [ "${BR_CARGO_MANIFEST_PATH}" ]; then
 fi
 
 manifest=Cargo.toml
-while getopts "n:o:m:" OPT; do
+while getopts "n:o:m:l:" OPT; do
     case "${OPT}" in
     o)  output="${OPTARG}";;
     n)  base_name="${OPTARG}";;
     m)  manifest="${OPTARG}";;
+    l)  lockfile="${OPTARG}";;
     :)  error "option '%s' expects a mandatory argument\n" "${OPTARG}";;
     \?) error "unknown option '%s'\n" "${OPTARG}";;
     esac
@@ -30,6 +31,22 @@ post_process_unpack "${base_name}" "${output}"
 
 # Do the Cargo vendoring
 pushd "${base_name}" > /dev/null
+
+# If a lockfile was explicitly provided via -l option, use it
+if [ -n "${lockfile}" ]; then
+    # Search upwards from the manifest to find the top-most Cargo.toml
+    dir="${manifest}"
+    lock_dir="$(dirname "${manifest}")"
+    while [ "${dir}" != "." ]; do
+        dir="$(dirname "${dir}")"
+        if [ -e "${dir}/Cargo.toml" ]; then
+            lock_dir="${dir}"
+        fi
+    done
+
+    cp "${lockfile}" "${lock_dir}/Cargo.lock"
+    printf 'Using provided Cargo.lock from %s\n' "${lockfile}"
+fi
 
 # Create the local .cargo/config.toml with vendor info
 mkdir -p .cargo/
