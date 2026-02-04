@@ -195,6 +195,20 @@ ifneq ($$($(2)_SUBDIR),)
 $(2)_DOWNLOAD_POST_PROCESS_OPTS += -m$$($(2)_SUBDIR)/Cargo.toml
 endif
 
+# Automatically detect if a Cargo.lock file exists in the package directory
+# and use it for vendoring if present
+ifneq ($$(wildcard $(pkgdir)/Cargo.lock),)
+# Set the lock version if not already set, defaulting to 1
+ifndef $(3)_CARGO_LOCK_VERSION
+ $(3)_CARGO_LOCK_VERSION = 1
+endif
+# Only set EXTRA_FMT_VERSION if lock version is greater than 1
+ifneq ($$($(3)_CARGO_LOCK_VERSION),1)
+$(2)_EXTRA_FMT_VERSION = -lock$$($(3)_CARGO_LOCK_VERSION)
+endif
+$(2)_DOWNLOAD_POST_PROCESS_OPTS += -l $$(abspath $(pkgdir)/Cargo.lock)
+endif
+
 # Because we append vendored info, we can't rely on the values being empty
 # once we eventually get into the generic-package infra. So, we duplicate
 # the heuristics here
