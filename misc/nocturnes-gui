@@ -1,0 +1,170 @@
+#!/usr/bin/env python3
+#
+# Nocturnes GUI - Simple GTK3 control panel for nocturnes-ctl
+#
+
+import gi
+import os
+import subprocess
+import threading
+
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk, GLib, Pango
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+CTL = os.path.join(SCRIPT_DIR, "nocturnes-ctl")
+
+
+def run_ctl(args, callback=None):
+    """Run nocturnes-ctl in a thread so the GUI doesn't freeze."""
+
+    def _run():
+        try:
+            result = subprocess.run(
+                [CTL] + args,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            output = result.stdout + result.stderr
+        except subprocess.TimeoutExpired:
+            output = "Command timed out."
+        except Exception as e:
+            output = str(e)
+        if callback:
+            GLib.idle_add(callback, output.strip())
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+class NocturnesWindow(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Nocturnes Controller")
+        self.set_default_size(500, 400)
+        self.set_border_width(10)
+
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.add(vbox)
+
+        # --- Playback controls ---
+        frame_play = Gtk.Frame(label="Playback")
+        vbox.pack_start(frame_play, False, False, 0)
+        hbox = Gtk.Box(spacing=6)
+        hbox.set_border_width(6)
+        frame_play.add(hbox)
+
+        for label, cmd in [
+            ("Play", ["play"]),
+            ("Loop", ["loop"]),
+            ("Pause", ["pause"]),
+            ("Resume", ["resume"]),
+            ("Stop", ["stop"]),
+        ]:
+            btn = Gtk.Button(label=label)
+            btn.connect("clicked", self.on_cmd, cmd)
+            hbox.pack_start(btn, True, True, 0)
+
+        # --- Volume controls ---
+        frame_vol = Gtk.Frame(label="Volume")
+        vbox.pack_start(frame_vol, False, False, 0)
+        vol_box = Gtk.Box(spacing=6)
+        vol_box.set_border_width(6)
+        frame_vol.add(vol_box)
+
+        btn_mute = Gtk.Button(label="Mute")
+        btn_mute.connect("clicked", self.on_cmd, ["mute"])
+        vol_box.pack_start(btn_mute, False, False, 0)
+
+        btn_unmute = Gtk.Button(label="Unmute")
+        btn_unmute.connect("clicked", self.on_cmd, ["unmute"])
+        vol_box.pack_start(btn_unmute, False, False, 0)
+
+        self.vol_scale = Gtk.Scale.new_with_range(
+            Gtk.Orientation.HORIZONTAL, 0, 100, 5
+        )
+        self.vol_scale.set_value(80)
+        self.vol_scale.set_draw_value(True)
+        vol_box.pack_start(self.vol_scale, True, True, 0)
+
+        btn_vol = Gtk.Button(label="Set")
+        btn_vol.connect("clicked", self.on_set_volume)
+        vol_box.pack_start(btn_vol, False, False, 0)
+
+        # --- System controls ---
+        frame_sys = Gtk.Frame(label="System")
+        vbox.pack_start(frame_sys, False, False, 0)
+        sys_box = Gtk.Box(spacing=6)
+        sys_box.set_border_width(6)
+        frame_sys.add(sys_box)
+
+        btn_status = Gtk.Button(label="Status")
+        btn_status.connect("clicked", self.on_cmd, ["status"])
+        sys_box.pack_start(btn_status, True, True, 0)
+
+        btn_wake = Gtk.Button(label="Wake All")
+        btn_wake.connect("clicked", self.on_cmd, ["wake"])
+        sys_box.pack_start(btn_wake, True, True, 0)
+
+        btn_reboot = Gtk.Button(label="Reboot All")
+        btn_reboot.connect("clicked", self.on_confirm_cmd, ["reboot"])
+        sys_box.pack_start(btn_reboot, True, True, 0)
+
+        btn_poweroff = Gtk.Button(label="Power Off All")
+        btn_poweroff.connect("clicked", self.on_confirm_cmd, ["poweroff"])
+        sys_box.pack_start(btn_poweroff, True, True, 0)
+
+        # --- Log output ---
+        frame_log = Gtk.Frame(label="Output")
+        vbox.pack_start(frame_log, True, True, 0)
+
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_border_width(4)
+        frame_log.add(scroll)
+
+        self.textview = Gtk.TextView()
+        self.textview.set_editable(False)
+        self.textview.set_cursor_visible(False)
+        self.textview.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        self.textview.override_font(Pango.FontDescription("monospace 9"))
+        scroll.add(self.textview)
+
+        self.log_buf = self.textview.get_buffer()
+
+    def log(self, text):
+        end = self.log_buf.get_end_iter()
+        if self.log_buf.get_char_count() > 0:
+            self.log_buf.insert(end, "\n")
+            end = self.log_buf.get_end_iter()
+        self.log_buf.insert(end, text)
+        # Scroll to bottom
+        end_mark = self.log_buf.create_mark(None, self.log_buf.get_end_iter(), False)
+        self.textview.scroll_to_mark(end_mark, 0, False, 0, 0)
+
+    def on_cmd(self, _btn, cmd):
+        self.log(f"$ nocturnes-ctl {' '.join(cmd)}")
+        run_ctl(cmd, callback=self.log)
+
+    def on_set_volume(self, _btn):
+        level = int(self.vol_scale.get_value())
+        cmd = ["volume", str(level)]
+        self.log(f"$ nocturnes-ctl {' '.join(cmd)}")
+        run_ctl(cmd, callback=self.log)
+
+    def on_confirm_cmd(self, _btn, cmd):
+        dialog = Gtk.MessageDialog(
+            transient_for=self,
+            modal=True,
+            message_type=Gtk.MessageType.WARNING,
+            buttons=Gtk.ButtonsType.YES_NO,
+            text=f"Are you sure you want to {cmd[0]} all devices?",
+        )
+        response = dialog.run()
+        dialog.destroy()
+        if response == Gtk.ResponseType.YES:
+            self.on_cmd(_btn, cmd)
+
+
+win = NocturnesWindow()
+win.connect("destroy", Gtk.main_quit)
+win.show_all()
+Gtk.main()

@@ -1,0 +1,343 @@
+#!/bin/bash
+#
+# Nocturnes - Synchronized Video Playback Controller
+# Controls mpv on multiple Raspberry Pi devices via TCP IPC
+#
+
+# ffmpeg -i input.mp4 \
+#   -c:v libx264 -profile:v high \
+#   -b:v 12M -minrate 12M -maxrate 12M -bufsize 12M \
+#   -x264-params "nal-hrd=cbr" \
+#   -g 60 -keyint_min 60 -sc_threshold 0 \
+#   -r 60 -vsync cfr \
+#   -s 1920x1080 \
+#   -c:a aac -b:a 192k \
+#   -movflags +faststart \
+#   output.mp4
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+HOSTS_FILE="$SCRIPT_DIR/nocturnes-hosts.conf"
+VIDEO_DIR="/opt/video"
+MPV_PORT=6600
+SSH_USER="root"
+SSH_PASS="root"
+SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=3 -o LogLevel=ERROR"
+SSH="sshpass -p $SSH_PASS ssh $SSH_OPTS"
+SCP="sshpass -p $SSH_PASS scp -O $SSH_OPTS"
+
+if [ ! -f "$HOSTS_FILE" ]; then
+	echo "Error: $HOSTS_FILE not found"
+	exit 1
+fi
+
+# Read hosts file into parallel arrays: HOSTS[], FILES[], MACS[]
+HOSTS=()
+FILES=()
+MACS=()
+while read -r ip file mac rest; do
+	case "$ip" in "" | \#*) continue ;; esac
+	HOSTS+=("$ip")
+	FILES+=("${file:-content.mp4}")
+	MACS+=("${mac:-}")
+done <"$HOSTS_FILE"
+
+if [ ${#HOSTS[@]} -eq 0 ]; then
+	echo "Error: no hosts configured in $HOSTS_FILE"
+	exit 1
+fi
+
+# Send JSON IPC command to a single host via TCP
+mpv_ipc() {
+	local host="$1"
+	local json="$2"
+	echo "$json" | socat -t2 - "TCP:${host}:${MPV_PORT},connect-timeout=5" 2>/dev/null
+}
+
+print_summary() {
+	local ok=$1 fail=$2
+	local total=$((ok + fail))
+	if [ "$fail" -eq 0 ]; then
+		echo "OK ($total/$total)"
+	else
+		echo "$ok/$total OK, $fail FAILED"
+	fi
+}
+
+# Send same JSON IPC command to all hosts in parallel
+mpv_cmd_all() {
+	local json="$1"
+	local pids=() _hosts=()
+	for host in "${HOSTS[@]}"; do
+		mpv_ipc "$host" "$json" >/dev/null &
+		pids+=($!)
+		_hosts+=("$host")
+	done
+	local ok=0 fail=0
+	for i in "${!pids[@]}"; do
+		if wait "${pids[$i]}" 2>/dev/null; then
+			ok=$((ok + 1))
+		else
+			echo "  FAIL ${_hosts[$i]}"
+			fail=$((fail + 1))
+		fi
+	done
+	print_summary $ok $fail
+}
+
+# Run SSH command on all hosts in parallel
+ssh_cmd_all() {
+	local cmd="$1"
+	local pids=() _hosts=()
+	for host in "${HOSTS[@]}"; do
+		$SSH "$SSH_USER@$host" "$cmd" 2>/dev/null &
+		pids+=($!)
+		_hosts+=("$host")
+	done
+	local ok=0 fail=0
+	for i in "${!pids[@]}"; do
+		if wait "${pids[$i]}" 2>/dev/null; then
+			ok=$((ok + 1))
+		else
+			echo "  FAIL ${_hosts[$i]}"
+			fail=$((fail + 1))
+		fi
+	done
+	print_summary $ok $fail
+}
+
+case "$1" in
+play)
+	echo ">>> Loading content on ${#HOSTS[@]} devices..."
+	pids=()
+	_load_hosts=()
+	for i in "${!HOSTS[@]}"; do
+		host="${HOSTS[$i]}"
+		file="${FILES[$i]}"
+		_load_hosts+=("$host -> $file")
+		(
+			mpv_ipc "$host" '{"command":["set_property","pause",true]}' >/dev/null &&
+			mpv_ipc "$host" "{\"command\":[\"loadfile\",\"${VIDEO_DIR}/${file}\"]}" >/dev/null
+		) &
+		pids+=($!)
+	done
+	ok=0 fail=0
+	for i in "${!pids[@]}"; do
+		if wait "${pids[$i]}" 2>/dev/null; then
+			echo "  OK   ${_load_hosts[$i]}"
+			ok=$((ok + 1))
+		else
+			echo "  FAIL ${_load_hosts[$i]}"
+			fail=$((fail + 1))
+		fi
+	done
+	print_summary $ok $fail
+	[ "$ok" -gt 0 ] || exit 1
+
+	sleep 2
+
+	echo ">>> Starting playback..."
+	mpv_cmd_all '{"command":["set_property","pause",false]}'
+	;;
+
+loop)
+	echo ">>> Looping content on ${#HOSTS[@]} devices..."
+	pids=()
+	_load_hosts=()
+	for i in "${!HOSTS[@]}"; do
+		host="${HOSTS[$i]}"
+		file="${FILES[$i]}"
+		_load_hosts+=("$host -> $file")
+		(
+			mpv_ipc "$host" '{"command":["set_property","pause",true]}' >/dev/null &&
+			mpv_ipc "$host" '{"command":["set_property","loop-file","inf"]}' >/dev/null &&
+			mpv_ipc "$host" "{\"command\":[\"loadfile\",\"${VIDEO_DIR}/${file}\"]}" >/dev/null
+		) &
+		pids+=($!)
+	done
+	ok=0 fail=0
+	for i in "${!pids[@]}"; do
+		if wait "${pids[$i]}" 2>/dev/null; then
+			echo "  OK   ${_load_hosts[$i]}"
+			ok=$((ok + 1))
+		else
+			echo "  FAIL ${_load_hosts[$i]}"
+			fail=$((fail + 1))
+		fi
+	done
+	print_summary $ok $fail
+	[ "$ok" -gt 0 ] || exit 1
+
+	sleep 2
+
+	echo ">>> Starting playback..."
+	mpv_cmd_all '{"command":["set_property","pause",false]}'
+	;;
+
+stop)
+	echo ">>> Stopping playback..."
+	mpv_cmd_all '{"command":["stop"]}'
+	;;
+
+pause)
+	echo ">>> Pausing all devices..."
+	mpv_cmd_all '{"command":["set_property","pause",true]}'
+	;;
+
+resume)
+	echo ">>> Resuming all devices..."
+	mpv_cmd_all '{"command":["set_property","pause",false]}'
+	;;
+
+push)
+	dir="$2"
+	if [ -z "$dir" ] || [ ! -d "$dir" ]; then
+		echo "Usage: $0 push <directory_with_video_files>"
+		echo ""
+		echo "The directory should contain the files referenced in $HOSTS_FILE."
+		echo "Each file is pushed to its assigned device."
+		exit 1
+	fi
+	echo ">>> Pushing content to ${#HOSTS[@]} devices..."
+	pids=()
+	_push_hosts=()
+	ok=0 fail=0
+	for i in "${!HOSTS[@]}"; do
+		host="${HOSTS[$i]}"
+		file="${FILES[$i]}"
+		src="$dir/$file"
+		if [ ! -f "$src" ]; then
+			echo "  SKIP $host: $src not found"
+			continue
+		fi
+		local_md5=$(md5sum "$src" | cut -d' ' -f1)
+		remote_md5=$($SSH "$SSH_USER@$host" "md5sum $VIDEO_DIR/$file 2>/dev/null | cut -d' ' -f1")
+		if [ "$local_md5" = "$remote_md5" ]; then
+			echo "  OK   $host: $file already up to date"
+			ok=$((ok + 1))
+			continue
+		fi
+		echo "  PUSH $host <- $file"
+		$SCP "$src" "$SSH_USER@$host:$VIDEO_DIR/$file" &
+		pids+=($!)
+		_push_hosts+=("$host")
+	done
+	for i in "${!pids[@]}"; do
+		if wait "${pids[$i]}" 2>/dev/null; then
+			ok=$((ok + 1))
+		else
+			echo "  FAIL ${_push_hosts[$i]}"
+			fail=$((fail + 1))
+		fi
+	done
+	print_summary $ok $fail
+	;;
+
+status)
+	for i in "${!HOSTS[@]}"; do
+		host="${HOSTS[$i]}"
+		file="${FILES[$i]}"
+		printf "%-16s %-20s " "$host" "$file"
+		resp=$(mpv_ipc "$host" '{"command":["get_property","idle-active"]}' 2>/dev/null)
+		if [ -z "$resp" ]; then
+			echo "UNREACHABLE"
+		elif echo "$resp" | grep -q '"data":true'; then
+			echo "mpv idle"
+		else
+			echo "mpv playing"
+		fi
+	done
+	;;
+
+reboot)
+	echo ">>> Rebooting all devices..."
+	ssh_cmd_all "reboot &"
+	;;
+
+poweroff)
+	echo ">>> Powering off all devices..."
+	ssh_cmd_all "poweroff &"
+	;;
+
+wake)
+	if ! command -v wakeonlan >/dev/null 2>&1 &&
+		! command -v etherwake >/dev/null 2>&1; then
+		echo "Error: install wakeonlan or etherwake"
+		exit 1
+	fi
+	echo ">>> Waking all devices..."
+	ok=0 fail=0
+	for i in "${!HOSTS[@]}"; do
+		host="${HOSTS[$i]}"
+		mac="${MACS[$i]}"
+		if [ -z "$mac" ]; then
+			mac=$(arp -n "$host" 2>/dev/null | awk '/ether/{print $3}')
+		fi
+		if [ -z "$mac" ]; then
+			echo "  SKIP $host: no MAC (add MAC to hosts file or ping first)"
+			fail=$((fail + 1))
+			continue
+		fi
+		# Derive broadcast address from host IP (assume /24)
+		bcast="${host%.*}.255"
+		printf "  %-16s %s (via %s)\n" "$host" "$mac" "$bcast"
+		if command -v wakeonlan >/dev/null 2>&1; then
+			wakeonlan -i "$bcast" "$mac"
+		else
+			etherwake -b "$mac" 2>/dev/null
+		fi
+		ok=$((ok + 1))
+	done
+	print_summary $ok $fail
+	;;
+
+volume)
+	level="$2"
+	if [ -z "$level" ]; then
+		echo ">>> Current volume on all devices:"
+		for host in "${HOSTS[@]}"; do
+			printf "  %-16s " "$host"
+			$SSH "$SSH_USER@$host" "amixer -c1 sget 'Headphone' 2>/dev/null | grep -o '[0-9]*%' | head -1" 2>/dev/null || echo "UNREACHABLE"
+		done
+	else
+		echo ">>> Setting volume to ${level}% on all devices..."
+		ssh_cmd_all "amixer -c1 sset 'Headphone' ${level}% >/dev/null 2>&1; amixer -c1 sset 'Speaker' ${level}% >/dev/null 2>&1"
+	fi
+	;;
+
+mute)
+	echo ">>> Muting all devices..."
+	ssh_cmd_all "amixer -c1 sset 'Headphone' mute >/dev/null 2>&1; amixer -c1 sset 'Speaker' mute >/dev/null 2>&1"
+	;;
+
+unmute)
+	echo ">>> Unmuting all devices..."
+	ssh_cmd_all "amixer -c1 sset 'Headphone' unmute >/dev/null 2>&1; amixer -c1 sset 'Speaker' unmute >/dev/null 2>&1"
+	;;
+
+*)
+	cat <<EOF
+Nocturnes - Synchronized Video Playback Controller
+
+Usage: $0 <command> [args]
+
+Commands:
+  play            Play each device's assigned video
+  loop            Loop each device's assigned video
+  stop            Stop playback on all devices
+  pause           Pause all devices
+  resume          Resume all devices
+  push <dir>      Upload video files from directory to assigned devices
+  status          Show status of all devices
+  volume [0-100]  Get or set volume on all devices
+  mute            Mute all devices
+  unmute          Unmute all devices
+  reboot          Reboot all devices
+  poweroff        Power off all devices
+  wake            Wake all devices via Wake-on-LAN
+
+Hosts/content: $HOSTS_FILE
+Video dir: $VIDEO_DIR (on each RPi)
+EOF
+	exit 1
+	;;
+esac
