@@ -1,0 +1,47 @@
+#!/bin/sh
+
+PIDFILE="/var/run/mpv.pid"
+SOCAT_PID="/var/run/mpv-socat.pid"
+MPV_SOCK="/tmp/mpv.sock"
+MPV_PORT=6600
+
+case "$1" in
+start)
+	printf "Starting mpv: "
+	rm -f "$MPV_SOCK"
+	start-stop-daemon -S -b -m -p "$PIDFILE" -x /bin/sh -- -c \
+	  "exec setsid mpv \
+	  --input-ipc-server=$MPV_SOCK \
+	  --vo=gpu --gpu-context=drm \
+	  --ao=alsa \
+	  --idle=yes \
+	  --force-window=yes \
+	  --background-color=000000 \
+	  --profile=low-latency \
+	  --video-sync=audio \
+	  --really-quiet \
+	  </dev/tty1 >/dev/null 2>&1"
+	# Wait for mpv to create the socket
+	sleep 1
+	# Expose IPC over TCP so the controller can connect directly
+	start-stop-daemon -S -b -m -p "$SOCAT_PID" -x /usr/bin/socat -- \
+	  TCP-LISTEN:${MPV_PORT},fork,reuseaddr UNIX-CONNECT:${MPV_SOCK}
+	echo "OK"
+	;;
+stop)
+	printf "Stopping mpv: "
+	start-stop-daemon -K -p "$SOCAT_PID" -s TERM 2>/dev/null
+	start-stop-daemon -K -p "$PIDFILE" -s TERM
+	rm -f "$PIDFILE" "$SOCAT_PID" "$MPV_SOCK"
+	echo "OK"
+	;;
+restart)
+	$0 stop
+	sleep 1
+	$0 start
+	;;
+*)
+	echo "Usage: $0 {start|stop|restart}"
+	exit 1
+	;;
+esac
