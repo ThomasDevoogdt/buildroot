@@ -1,0 +1,34 @@
+#!/bin/bash
+
+INTERFACE="enp0s31f6"
+ROUTER_IP="192.168.10.1"
+SUBNET_MASK="255.255.255.0"
+
+# DHCP Settings
+DHCP_START="192.168.10.10"
+DHCP_END="192.168.10.50"
+LEASE_TIME="infinite" # e.g., 12h, 30m, or infinite
+DNS_SERVER="1.1.1.1"
+
+if [ "$EUID" -ne 0 ]; then
+	echo "Elevating privileges to configure network interface..."
+	exec sudo "$0" "$@"
+fi
+
+echo "Configuring interface $INTERFACE with IP $ROUTER_IP..."
+
+# Remove existing IPs to prevent conflicts, then add the new one
+ip addr flush dev "$INTERFACE"
+ip addr add "$ROUTER_IP/$SUBNET_MASK" dev "$INTERFACE"
+ip link set dev "$INTERFACE" up
+
+echo "Starting DHCP server on $INTERFACE (Press Ctrl+C to stop)..."
+
+dnsmasq -d -C - <<EOF
+port=0
+interface=$INTERFACE
+bind-interfaces
+dhcp-range=$DHCP_START,$DHCP_END,$SUBNET_MASK,$LEASE_TIME
+dhcp-option=option:router,$ROUTER_IP
+dhcp-option=option:dns-server,$DNS_SERVER
+EOF
