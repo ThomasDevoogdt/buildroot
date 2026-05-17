@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# Enable Wake-on-LAN on all Ethernet interfaces
+#
+
+case "$1" in
+start)
+	for iface in /sys/class/net/e*; do
+		iface=$(basename "$iface")
+		printf "Enabling WOL on %s: " "$iface"
+		ethtool -s "$iface" wol g 2>/dev/null \
+			&& echo "OK" || echo "SKIP"
+	done
+	;;
+*)
+	echo "Usage: $0 start"
+	;;
+esac
