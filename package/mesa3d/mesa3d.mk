@@ -189,6 +189,12 @@ else
 MESA3D_CONF_OPTS += -Dgallium-va=disabled
 endif
 
+ifeq ($(BR2_PACKAGE_MESA3D_VIDEO_CODECS),y)
+MESA3D_CONF_OPTS += -Dvideo-codecs=all
+else
+MESA3D_CONF_OPTS += -Dvideo-codecs=all_free
+endif
+
 # libGL is only provided for a full xorg stack, without libglvnd
 ifeq ($(BR2_PACKAGE_MESA3D_OPENGL_GLX),y)
 MESA3D_PROVIDES += $(if $(BR2_PACKAGE_LIBGLVND),,libgl)
