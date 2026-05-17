@@ -1,0 +1,4 @@
+# Disable reverse DNS by using a non-resolving wrapper
+# Dropbear doesn't have a no-DNS flag, so we use UseDNS equivalent
+# by keeping connections fast
+DROPBEAR_ARGS=""
