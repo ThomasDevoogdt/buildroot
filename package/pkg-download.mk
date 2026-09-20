@@ -63,7 +63,8 @@ BR_NO_CHECK_HASH_FOR =
 # DOWNLOAD_URIS - List the candidates URIs where to get the package from:
 # 1) BR2_PRIMARY_SITE if enabled
 # 2) Download site, unless BR2_PRIMARY_SITE_ONLY is set
-# 3) BR2_BACKUP_SITE if enabled, unless BR2_PRIMARY_SITE_ONLY is set
+# 3) each site in BR2_BACKUP_SITE, in the order they are listed, unless
+#    BR2_PRIMARY_SITE_ONLY is set
 #
 # Argument 1 is the source location
 # Argument 2 is the upper-case package name
@@ -81,8 +82,9 @@ DOWNLOAD_URIS += \
 	$(patsubst %/,%,$(dir $(call qstrip,$(1))))
 ifneq ($(call qstrip,$(BR2_BACKUP_SITE)),)
 DOWNLOAD_URIS += \
-	$(call getschemeplusuri,$(call qstrip,$(BR2_BACKUP_SITE)/$($(2)_DL_SUBDIR)),urlencode) \
-	$(call getschemeplusuri,$(call qstrip,$(BR2_BACKUP_SITE)),urlencode)
+	$(foreach site,$(call qstrip,$(BR2_BACKUP_SITE)),\
+		$(call getschemeplusuri,$(site)/$($(2)_DL_SUBDIR),urlencode) \
+		$(call getschemeplusuri,$(site),urlencode))
 endif
 endif
 

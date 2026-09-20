@@ -289,12 +289,18 @@ config BR2_PRIMARY_SITE_ONLY
 if !BR2_PRIMARY_SITE_ONLY
 
 config BR2_BACKUP_SITE
-	string "Backup download site"
+	string "Backup download sites"
 	default "https://sources.buildroot.net"
 	help
-	  Backup site to download from. If this option is set then
-	  buildroot will fall back to download package sources from here
-	  if the normal location fails.
+	  Backup sites to download from. If this option is set then
+	  buildroot will fall back to download package sources from
+	  these sites if the normal location fails.
+
+	  Several backup sites can be specified, separated by spaces.
+	  They are tried in the order they are listed, which allows to
+	  add e.g. a corporate mirror without dropping the default one:
+
+	    https://mirror.example.com https://sources.buildroot.net
 
 config BR2_KERNEL_MIRROR
 	string "Kernel.org mirror"
