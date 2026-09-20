@@ -30,6 +30,12 @@ endif
 # ensure it exists and a absolute path, dereferencing symlinks
 DL_DIR := $(shell mkdir -p $(DL_DIR) && cd $(DL_DIR) >/dev/null && pwd -P)
 
+# Restore the BR2_BACKUP_SITE from the environment, if any, as it was
+# overridden by the .config file
+ifneq ($(origin BR_BACKUP_SITE),undefined)
+BR2_BACKUP_SITE = $(BR_BACKUP_SITE)
+endif
+
 #
 # URI scheme helper functions
 # Example URIs:

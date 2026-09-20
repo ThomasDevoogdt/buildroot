@@ -302,6 +302,10 @@ config BR2_BACKUP_SITE
 
 	    https://mirror.example.com https://sources.buildroot.net
 
+	  If the Linux shell environment has defined the BR2_BACKUP_SITE
+	  environment variable, then this overrides this configuration
+	  item.
+
 config BR2_KERNEL_MIRROR
 	string "Kernel.org mirror"
 	default "https://cdn.kernel.org/pub"

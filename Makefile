@@ -206,6 +206,9 @@ endif
 ifneq ($(BR2_CCACHE_DIR),)
 BR_CACHE_DIR := $(BR2_CCACHE_DIR)
 endif
+ifneq ($(BR2_BACKUP_SITE),)
+BR_BACKUP_SITE := $(BR2_BACKUP_SITE)
+endif
 
 # Need that early, before we scan packages
 # Avoids doing the $(or...) everytime
