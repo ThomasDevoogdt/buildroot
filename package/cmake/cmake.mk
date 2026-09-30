@@ -12,8 +12,15 @@ CMAKE_LICENSE = BSD-3-Clause
 CMAKE_LICENSE_FILES = LICENSE.rst
 CMAKE_CPE_ID_VALID = YES
 
-# The package is a dependency to ccache so ccache cannot be a dependency
+# host-cmake can only use ccache when host-ccache is built with a system cmake
+ifeq ($(BR2_CCACHE):$(BR2_CMAKE_NOCCACHE_HOST_DEPENDENCY),y:)
+HOST_CMAKE_BOOTSTRAP_OPTS = --enable-ccache
+HOST_CMAKE_CCACHE_OPTS = \
+	-DCMAKE_C_COMPILER_LAUNCHER=$(CCACHE) \
+	-DCMAKE_CXX_COMPILER_LAUNCHER=$(CCACHE)
+else
 HOST_CMAKE_ADD_CCACHE_DEPENDENCY = NO
+endif
 
 # CMake is a particular package:
 # * CMake can be built using the generic infrastructure or the cmake one.
@@ -43,7 +50,7 @@ CMAKE_CONF_OPTS = \
 HOST_CMAKE_CFLAGS = $(shell echo $(HOST_CFLAGS) | sed -r "s%$(HOST_CPPFLAGS)%%")
 HOST_CMAKE_CXXFLAGS = $(shell echo $(HOST_CXXFLAGS) | sed -r "s%$(HOST_CPPFLAGS)%%")
 
-# We may be a ccache dependency, so we can't use ccache
+# ccache is enabled via bootstrap options, not via CC/CXX
 HOST_CMAKE_CONFIGURE_OPTS = \
 	$(HOST_CONFIGURE_OPTS) \
 	CC="$(HOSTCC_NOCCACHE)" \
@@ -55,7 +62,9 @@ define HOST_CMAKE_CONFIGURE_CMDS
 		$(HOST_CMAKE_CONFIGURE_OPTS) \
 		CFLAGS="$(HOST_CMAKE_CFLAGS)" \
 		./bootstrap --prefix=$(HOST_DIR) \
-			--parallel=$(PARALLEL_JOBS) -- \
+			--parallel=$(PARALLEL_JOBS) \
+			$(HOST_CMAKE_BOOTSTRAP_OPTS) -- \
+			$(HOST_CMAKE_CCACHE_OPTS) \
 			-DCMAKE_C_FLAGS="$(HOST_CMAKE_CFLAGS)" \
 			-DCMAKE_CXX_FLAGS="$(HOST_CMAKE_CXXFLAGS)" \
 			-DCMAKE_EXE_LINKER_FLAGS="$(HOST_LDFLAGS)" \

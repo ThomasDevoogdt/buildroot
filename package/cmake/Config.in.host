@@ -8,6 +8,9 @@ config BR2_PACKAGE_HOST_CMAKE
 	  generate native makefiles and workspaces that can be used in
 	  the compiler environment of your choice.
 
+	  When enabled, this cmake is used to build all CMake
+	  packages, instead of a cmake from the build machine.
+
 	  http://www.cmake.org/
 
 # The minimum system cmake version we expect if 3.18 as provided by
