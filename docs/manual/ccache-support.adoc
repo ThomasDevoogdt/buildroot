@@ -15,6 +15,11 @@ speed up the build process.
 +Enable compiler cache+ in +Build options+. This will automatically
 build +ccache+ and use it for every host and target compilation.
 
+Since +ccache+ is built with CMake, a suitable CMake from the build
+machine (at least 3.18) is used for +ccache+ and its dependencies. This
+allows +host-cmake+, if needed, to be built with +ccache+ as well.
+Without such a CMake, +host-cmake+ is built first, without +ccache+.
+
 The cache is located in the directory defined by the +BR2_CCACHE_DIR+
 configuration option, which defaults to
 +$HOME/.buildroot-ccache+. This default location is outside of
