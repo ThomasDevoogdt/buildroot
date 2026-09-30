@@ -12,9 +12,6 @@ CMAKE_LICENSE = BSD-3-Clause
 CMAKE_LICENSE_FILES = LICENSE.rst
 CMAKE_CPE_ID_VALID = YES
 
-# The package is a dependency to ccache so ccache cannot be a dependency
-HOST_CMAKE_ADD_CCACHE_DEPENDENCY = NO
-
 # CMake is a particular package:
 # * CMake can be built using the generic infrastructure or the cmake one.
 #   Since Buildroot has no requirement regarding the host system cmake
@@ -43,12 +40,37 @@ CMAKE_CONF_OPTS = \
 HOST_CMAKE_CFLAGS = $(shell echo $(HOST_CFLAGS) | sed -r "s%$(HOST_CPPFLAGS)%%")
 HOST_CMAKE_CXXFLAGS = $(shell echo $(HOST_CXXFLAGS) | sed -r "s%$(HOST_CPPFLAGS)%%")
 
-# We may be a ccache dependency, so we can't use ccache
+# ccache is enabled via CMAKE_<LANG>_COMPILER_LAUNCHER, not via CC/CXX
 HOST_CMAKE_CONFIGURE_OPTS = \
 	$(HOST_CONFIGURE_OPTS) \
 	CC="$(HOSTCC_NOCCACHE)" \
 	GCC="$(HOSTCC_NOCCACHE)" \
 	CXX="$(HOSTCXX_NOCCACHE)"
+
+HOST_CMAKE_CONF_OPTS = \
+	-DCMAKE_C_FLAGS="$(HOST_CMAKE_CFLAGS)" \
+	-DCMAKE_CXX_FLAGS="$(HOST_CMAKE_CXXFLAGS)" \
+	-DCMAKE_EXE_LINKER_FLAGS="$(HOST_LDFLAGS)" \
+	-DCMAKE_USE_OPENSSL:BOOL=OFF \
+	-DBUILD_CursesDialog=OFF
+
+# When host-ccache is built with a system cmake, host-cmake can use both
+# ccache and that cmake, which avoids the slow bootstrap.
+ifeq ($(BR2_CCACHE):$(BR2_CMAKE_NOCCACHE_HOST_DEPENDENCY),y:)
+define HOST_CMAKE_CONFIGURE_CMDS
+	(cd $(@D); \
+		$(HOST_CMAKE_CONFIGURE_OPTS) \
+		$(BR2_CMAKE_NOCCACHE) . \
+			-G"Unix Makefiles" \
+			-DCMAKE_BUILD_TYPE=Release \
+			-DCMAKE_INSTALL_PREFIX="$(HOST_DIR)" \
+			-DCMAKE_C_COMPILER_LAUNCHER="$(CCACHE)" \
+			-DCMAKE_CXX_COMPILER_LAUNCHER="$(CCACHE)" \
+			$(HOST_CMAKE_CONF_OPTS) \
+	)
+endef
+else
+HOST_CMAKE_ADD_CCACHE_DEPENDENCY = NO
 
 define HOST_CMAKE_CONFIGURE_CMDS
 	(cd $(@D); \
@@ -56,13 +78,10 @@ define HOST_CMAKE_CONFIGURE_CMDS
 		CFLAGS="$(HOST_CMAKE_CFLAGS)" \
 		./bootstrap --prefix=$(HOST_DIR) \
 			--parallel=$(PARALLEL_JOBS) -- \
-			-DCMAKE_C_FLAGS="$(HOST_CMAKE_CFLAGS)" \
-			-DCMAKE_CXX_FLAGS="$(HOST_CMAKE_CXXFLAGS)" \
-			-DCMAKE_EXE_LINKER_FLAGS="$(HOST_LDFLAGS)" \
-			-DCMAKE_USE_OPENSSL:BOOL=OFF \
-			-DBUILD_CursesDialog=OFF \
+			$(HOST_CMAKE_CONF_OPTS) \
 	)
 endef
+endif
 
 define HOST_CMAKE_BUILD_CMDS
 	$(HOST_MAKE_ENV) $(MAKE) -C $(@D)
