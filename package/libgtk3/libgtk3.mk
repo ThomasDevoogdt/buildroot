@@ -15,7 +15,11 @@ LIBGTK3_CPE_ID_PRODUCT = gtk
 LIBGTK3_INSTALL_STAGING = YES
 
 LIBGTK3_DEPENDENCIES = host-pkgconf host-libgtk3 at-spi2-core libglib2 cairo pango \
-	gdk-pixbuf libepoxy $(TARGET_NLS_DEPENDENCIES)
+	gdk-pixbuf libepoxy libfribidi $(TARGET_NLS_DEPENDENCIES)
+
+ifeq ($(BR2_PACKAGE_HARFBUZZ),y)
+LIBGTK3_DEPENDENCIES += harfbuzz
+endif
 
 ifeq ($(BR2_PACKAGE_LIBGTK3_X11),y)
 LIBGTK3_DEPENDENCIES += fontconfig xlib_libX11 xlib_libXext xlib_libXrandr xlib_libXrender xlib_libXi
