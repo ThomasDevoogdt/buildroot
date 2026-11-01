@@ -1,0 +1,37 @@
+From 1b700b3a929a960a104ebb762459227ebba4b2c0 Mon Sep 17 00:00:00 2001
+From: Thomas Devoogdt <thomas@devoogdt.com>
+Date: Sun, 1 Nov 2026 22:06:42 +0100
+Subject: [PATCH] meson: do not drop lib_tcolors when no curses library is
+ found
+
+The curses_libs loop variable is used as a dependency of lib_tcolors.
+When none of slang, ncursesw and ncurses is found, the loop finishes
+with curses_libs being the ncurses disabler, because it is built with
+"disabler : true". The disabler propagates to lib_tcolors, which then
+silently disappears, together with every target linking to it:
+dmesg, hexdump, lsblk and sfdisk.
+
+Only pass curses_libs to lib_tcolors when a library was found. This
+matches the autotools build, where these tools do not need curses.
+
+Upstream: https://github.com/util-linux/util-linux/pull/4743
+Signed-off-by: Thomas Devoogdt <thomas@devoogdt.com>
+---
+ lib/meson.build | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lib/meson.build b/lib/meson.build
+index 25febbc19..7d931523a 100644
+--- a/lib/meson.build
++++ b/lib/meson.build
+@@ -105,6 +105,6 @@ lib_tcolors = static_library(
+   'tcolors',
+   lib_color_sources,
+   include_directories : dir_include,
+-  dependencies : curses_libs)
++  dependencies : curses_libs.found() ? curses_libs : [])
+ 
+ lib_tcolors_manadocs = files('terminal-colors.d.5.adoc')
+-- 
+2.43.0
+

@@ -1,4 +1,4 @@
-From 2dacaf3eea391e3bbf48e7d3ecce02cafe045b6d Mon Sep 17 00:00:00 2001
+From 2fd67cc81debef7164f63772333033bfdc7fbdf3 Mon Sep 17 00:00:00 2001
 From: Karel Zak <kzak@redhat.com>
 Date: Wed, 27 May 2026 15:15:22 +0200
 Subject: [PATCH] loopdev: use openat2(RESOLVE_NO_SYMLINKS) for backing file
@@ -55,5 +55,5 @@ index 76685be70..31377fc9a 100644
  	DBG(SETUP, ul_debugobj(lc, "backing file open: OK"));
  
 -- 
-2.47.3
+2.43.0
 

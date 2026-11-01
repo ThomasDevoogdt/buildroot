@@ -14,15 +14,12 @@ UTIL_LINUX_LIBS_CPE_ID_VENDOR = $(UTIL_LINUX_CPE_ID_VENDOR)
 UTIL_LINUX_LIBS_CPE_ID_PRODUCT = $(UTIL_LINUX_CPE_ID_PRODUCT)
 
 # README.licensing claims that some files are GPL-2.0 only, but this is not
-# true. Some files are GPL-3.0+ but only in tests and optionally in hwclock
-# (but we disable that option). rfkill uses an ISC-style license.
+# true. Some files are GPL-3.0+ but only in tests and in hwclock (not built
+# here). rfkill uses an ISC-style license.
 UTIL_LINUX_LIBS_LICENSE = LGPL-2.1+ (libblkid, libfdisk, libmount), BSD-3-Clause (libuuid)
 UTIL_LINUX_LIBS_LICENSE_FILES = README.licensing \
 	Documentation/licenses/COPYING.BSD-3-Clause \
 	Documentation/licenses/COPYING.LGPL-2.1-or-later
-
-# 0002-autotools-optionally-add-libpthread-to-uuid.pc.patch
-UTIL_LINUX_LIBS_AUTORECONF = YES
 
 # This package is only used to build other packages that have a depdendency
 # on util-linux libraries which in turn may be dependencies for the full
@@ -31,77 +28,70 @@ UTIL_LINUX_LIBS_AUTORECONF = YES
 UTIL_LINUX_LIBS_INSTALL_TARGET = NO
 UTIL_LINUX_LIBS_INSTALL_STAGING = YES
 UTIL_LINUX_LIBS_DEPENDENCIES = \
+	host-bison \
+	host-flex \
 	host-pkgconf \
 	$(if $(BR2_PACKAGE_LIBXCRYPT),libxcrypt) \
 	$(TARGET_NLS_DEPENDENCIES)
-# --disable-year2038: tells the configure script to not abort if the
-# system is not Y2038 compliant. util-linux-libs will support year2038
-# if the system is compliant even with this option passed
 UTIL_LINUX_LIBS_CONF_OPTS += \
-	--disable-rpath \
-	--disable-makeinstall-chown \
-	--disable-year2038
+	-Dprogram-tests=false \
+	-Dtranslate-docs=disabled \
+	-Dbuild-bash-completion=disabled \
+	-Dbuild-liblastlog2=disabled \
+	-Dbuild-pam-lastlog2=disabled \
+	-Dbuild-plymouth-support=disabled \
+	-Dcryptsetup=disabled \
+	-Dcryptsetup-dlopen=disabled \
+	-Dbtrfs=disabled \
+	-Deconf=disabled \
+	-Dlibuser=disabled \
+	-Dlibutempter=disabled \
+	-Dsmack=disabled \
+	-Dsysvinit=disabled \
+	-Dnls=$(if $(BR2_SYSTEM_ENABLE_NLS),enabled,disabled)
 
-UTIL_LINUX_LIBS_LINK_LIBS = $(TARGET_NLS_LIBS)
-
-# Prevent the installation from attempting to move shared libraries from
-# ${usrlib_execdir} (/usr/lib) to ${libdir} (/lib), since both paths are
-# the same when merged usr is in use.
-ifeq ($(BR2_ROOTFS_MERGED_USR),y)
-UTIL_LINUX_LIBS_CONF_OPTS += --bindir=/usr/bin --sbindir=/usr/sbin --libdir=/usr/lib
-endif
-
-# systemd depends on util-linux-libs so we disable systemd support
-UTIL_LINUX_LIBS_CONF_OPTS += \
-	--without-systemd \
-	--with-systemdsystemunitdir=no
-
-# systemd/eudev depend on util-linux-libs so we disable udev support
-UTIL_LINUX_LIBS_CONF_OPTS += --without-udev
+# systemd/eudev depend on util-linux-libs so we disable systemd and udev support
+UTIL_LINUX_LIBS_CONF_OPTS += -Dsystemd=disabled
 
 # No libs use wchar
-UTIL_LINUX_LIBS_CONF_OPTS += --disable-widechar
+UTIL_LINUX_LIBS_CONF_OPTS += -Dwidechar=disabled
 
 # No libs use ncurses
-UTIL_LINUX_LIBS_CONF_OPTS += --without-ncursesw --without-ncurses
+UTIL_LINUX_LIBS_CONF_OPTS += -Dncursesw=disabled -Dncurses=disabled -Dslang=disabled
 
 # workaround for static_assert on uclibc-ng < 1.0.42
-UTIL_LINUX_LIBS_CONF_ENV += CFLAGS="$(TARGET_CFLAGS) -Dstatic_assert=_Static_assert"
-
-# Unfortunately, the util-linux does LIBS="" at the end of its
-# configure script. So we have to pass the proper LIBS value when
-# calling the configure script to make configure tests pass properly,
-# and then pass it again at build time.
-UTIL_LINUX_LIBS_CONF_ENV += LIBS="$(UTIL_LINUX_LIBS_LINK_LIBS)"
-UTIL_LINUX_LIBS_MAKE_OPTS += LIBS="$(UTIL_LINUX_LIBS_LINK_LIBS)"
+UTIL_LINUX_LIBS_CFLAGS = $(TARGET_CFLAGS) -Dstatic_assert=_Static_assert
 
 # libmount optionally uses selinux
 ifeq ($(BR2_PACKAGE_UTIL_LINUX_LIBMOUNT)$(BR2_PACKAGE_LIBSELINUX),yy)
 UTIL_LINUX_LIBS_DEPENDENCIES += libselinux
-UTIL_LINUX_LIBS_CONF_OPTS += --with-selinux
+UTIL_LINUX_LIBS_CONF_OPTS += -Dselinux=enabled
 else
-UTIL_LINUX_LIBS_CONF_OPTS += --without-selinux
+UTIL_LINUX_LIBS_CONF_OPTS += -Dselinux=disabled
 endif
 
 # Disable utilities
 UTIL_LINUX_LIBS_CONF_OPTS += \
-	--disable-all-programs \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_LIBBLKID),--enable-libblkid,--disable-libblkid) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_LIBFDISK),--enable-libfdisk,--disable-libfdisk) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_LIBMOUNT),--enable-libmount,--disable-libmount) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_LIBSMARTCOLS),--enable-libsmartcols,--disable-libsmartcols) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_LIBUUID),--enable-libuuid,--disable-libuuid)
+	$(foreach p,$(UTIL_LINUX_ALL_PROGRAMS),-Dbuild-$(p)=disabled) \
+	-Dbuild-libblkid=$(if $(BR2_PACKAGE_UTIL_LINUX_LIBBLKID),enabled,disabled) \
+	-Dbuild-libfdisk=$(if $(BR2_PACKAGE_UTIL_LINUX_LIBFDISK),enabled,disabled) \
+	-Dbuild-libmount=$(if $(BR2_PACKAGE_UTIL_LINUX_LIBMOUNT),enabled,disabled) \
+	-Dbuild-libsmartcols=$(if $(BR2_PACKAGE_UTIL_LINUX_LIBSMARTCOLS),enabled,disabled) \
+	-Dbuild-libuuid=$(if $(BR2_PACKAGE_UTIL_LINUX_LIBUUID),enabled,disabled)
 
 # libmount python bindings are separate, will be installed by full util-linux
-UTIL_LINUX_LIBS_CONF_OPTS += --without-python --disable-pylibmount
+UTIL_LINUX_LIBS_CONF_OPTS += -Dbuild-python=disabled -Dbuild-pylibmount=disabled
 
 # No libs use readline
-UTIL_LINUX_LIBS_CONF_OPTS += --without-readline
+UTIL_LINUX_LIBS_CONF_OPTS += -Dreadline=disabled
 
 # No libs use audit
-UTIL_LINUX_LIBS_CONF_OPTS += --without-audit
+UTIL_LINUX_LIBS_CONF_OPTS += -Daudit=disabled
 
 # No libs use libmagic
-UTIL_LINUX_LIBS_CONF_OPTS += --without-libmagic
+UTIL_LINUX_LIBS_CONF_OPTS += -Dmagic=disabled
 
-$(eval $(autotools-package))
+# No libs use zlib
+UTIL_LINUX_LIBS_CONF_OPTS += -Dzlib=disabled
+
+$(eval $(meson-package))

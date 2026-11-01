@@ -13,8 +13,9 @@ UTIL_LINUX_SOURCE = util-linux-$(UTIL_LINUX_VERSION).tar.xz
 UTIL_LINUX_SITE = $(BR2_KERNEL_MIRROR)/linux/utils/util-linux/v$(UTIL_LINUX_VERSION_MAJOR)
 
 # README.licensing claims that some files are GPL-2.0 only, but this is not
-# true. Some files are GPL-3.0+ but only in tests and optionally in hwclock
-# (but we disable that option). rfkill uses an ISC-style license.
+# true. Some files are GPL-3.0+ but only in tests and in hwclock (the meson
+# build has no option to drop the GPL-3.0+ date parser of hwclock).
+# rfkill uses an ISC-style license.
 UTIL_LINUX_LICENSE = \
 	GPL-2.0+, \
 	BSD-4-Clause, \
@@ -35,42 +36,55 @@ UTIL_LINUX_LICENSE_FILES = README.licensing \
 	Documentation/licenses/COPYING.LGPL-2.1-or-later \
 	Documentation/licenses/COPYING.MIT
 
+ifeq ($(BR2_PACKAGE_UTIL_LINUX_HWCLOCK),y)
+UTIL_LINUX_LICENSE += , GPL-3.0+ (hwclock)
+endif
+
 UTIL_LINUX_CPE_ID_VENDOR = kernel
 
 # 0003-loopdev-use-openat2-RESOLVE_NO_SYMLINKS-for-backing-.patch
 UTIL_LINUX_IGNORE_CVES += CVE-2026-27456
 
-# 0002-autotools-optionally-add-libpthread-to-uuid.pc.patch
-UTIL_LINUX_AUTORECONF = YES
-
 UTIL_LINUX_INSTALL_STAGING = YES
 UTIL_LINUX_DEPENDENCIES = \
+	host-bison \
+	host-flex \
 	host-pkgconf \
 	$(if $(BR2_PACKAGE_LIBXCRYPT),libxcrypt) \
 	$(if $(BR2_PACKAGE_UTIL_LINUX_LIBS),util-linux-libs) \
 	$(TARGET_NLS_DEPENDENCIES)
-# --disable-year2038: tells the configure script to not abort if the
-# system is not Y2038 compliant. util-linux will support year2038 if
-# the system is compliant even with this option passed
 UTIL_LINUX_CONF_OPTS += \
-	--disable-asciidoc \
-	--disable-makeinstall-chown \
-	--disable-poman \
-	--disable-rpath \
-	--disable-year2038 \
-	--enable-fs-paths-default=/sbin:/usr/sbin
+	-Dprogram-tests=false \
+	-Dtranslate-docs=disabled \
+	-Dbuild-bash-completion=disabled \
+	-Dbuild-liblastlog2=disabled \
+	-Dbuild-pam-lastlog2=disabled \
+	-Dbuild-plymouth-support=disabled \
+	-Dcryptsetup=disabled \
+	-Dcryptsetup-dlopen=disabled \
+	-Dbtrfs=disabled \
+	-Deconf=disabled \
+	-Dlibuser=disabled \
+	-Dlibutempter=disabled \
+	-Dsmack=disabled \
+	-Dsysvinit=disabled \
+	-Dfs-search-path=/sbin:/usr/sbin \
+	-Dnls=$(if $(BR2_SYSTEM_ENABLE_NLS),enabled,disabled)
 
-UTIL_LINUX_LINK_LIBS = $(TARGET_NLS_LIBS)
-
-HOST_UTIL_LINUX_DEPENDENCIES = host-pkgconf
+HOST_UTIL_LINUX_DEPENDENCIES = host-bison host-flex host-pkgconf
 
 # We also don't want the host-python dependency
 HOST_UTIL_LINUX_CONF_OPTS = \
-	--disable-asciidoc \
-	--disable-poman \
-	--without-systemd \
-	--with-systemdsystemunitdir=no \
-	--without-python
+	-Dprogram-tests=false \
+	-Dtranslate-docs=disabled \
+	-Dbuild-bash-completion=disabled \
+	-Dbuild-liblastlog2=disabled \
+	-Dbuild-pam-lastlog2=disabled \
+	-Dbuild-plymouth-support=disabled \
+	-Dbuild-python=disabled \
+	-Dbuild-pylibmount=disabled \
+	-Dnls=disabled \
+	-Dsystemd=disabled
 
 ifeq ($(BR2_PACKAGE_UTIL_LINUX_UUIDD),y)
 define UTIL_LINUX_USERS
@@ -82,79 +96,64 @@ ifneq ($(BR2_PACKAGE_UTIL_LINUX_BINARIES)$(BR2_PACKAGE_UTIL_LINUX_CRAMFS)$(BR2_P
 UTIL_LINUX_SELINUX_MODULES = fstools
 endif
 
-# Prevent the installation from attempting to move shared libraries from
-# ${usrlib_execdir} (/usr/lib) to ${libdir} (/lib), since both paths are
-# the same when merged usr is in use.
+# meson only installs below the prefix: /usr/{bin,sbin} by default. Without
+# merged usr, keep the binaries in /bin and /sbin, so they still overwrite
+# the ones installed by busybox, and so that agetty is in /sbin.
 ifeq ($(BR2_ROOTFS_MERGED_USR),y)
-UTIL_LINUX_CONF_OPTS += --bindir=/usr/bin --libdir=/usr/lib
 # Ditto for /usr/sbin and /usr/bin when merge sbin is in use
 ifeq ($(BR2_ROOTFS_MERGED_BIN),y)
-UTIL_LINUX_CONF_OPTS += --sbindir=/usr/bin
-else
-UTIL_LINUX_CONF_OPTS += --sbindir=/usr/sbin
+UTIL_LINUX_CONF_OPTS += -Dsbindir=bin
 endif
+else
+UTIL_LINUX_CONF_OPTS += -Dbindir=/bin -Dsbindir=/sbin
 endif
 
 ifeq ($(BR2_PACKAGE_SYSTEMD),y)
-UTIL_LINUX_CONF_OPTS += --with-systemd --with-systemdsystemunitdir=/usr/lib/systemd/system
+UTIL_LINUX_CONF_OPTS += -Dsystemd=enabled
 UTIL_LINUX_DEPENDENCIES += systemd
 else
-UTIL_LINUX_CONF_OPTS += --without-systemd --with-systemdsystemunitdir=no
-endif
-
+# libudev is only looked up when the systemd option is not disabled,
+# and libsystemd is not found without systemd.
 ifeq ($(BR2_PACKAGE_HAS_UDEV),y)
-UTIL_LINUX_CONF_OPTS += --with-udev
+UTIL_LINUX_CONF_OPTS += -Dsystemd=auto
 UTIL_LINUX_DEPENDENCIES += udev
 else
-UTIL_LINUX_CONF_OPTS += --without-udev
+UTIL_LINUX_CONF_OPTS += -Dsystemd=disabled
+endif
 endif
 
 ifeq ($(BR2_PACKAGE_NCURSES),y)
 UTIL_LINUX_DEPENDENCIES += ncurses
 ifeq ($(BR2_PACKAGE_NCURSES_WCHAR),y)
-UTIL_LINUX_CONF_OPTS += --with-ncursesw
-UTIL_LINUX_CONF_ENV += NCURSESW6_CONFIG=$(STAGING_DIR)/usr/bin/$(NCURSES_CONFIG_SCRIPTS)
+UTIL_LINUX_CONF_OPTS += -Dncursesw=enabled -Dncurses=disabled
 else
-UTIL_LINUX_CONF_OPTS += --without-ncursesw --with-ncurses --disable-widechar
-UTIL_LINUX_CONF_ENV += NCURSES6_CONFIG=$(STAGING_DIR)/usr/bin/$(NCURSES_CONFIG_SCRIPTS)
+UTIL_LINUX_CONF_OPTS += -Dncursesw=disabled -Dncurses=enabled -Dwidechar=disabled
 endif
 else
 ifeq ($(BR2_USE_WCHAR),y)
-UTIL_LINUX_CONF_OPTS += --enable-widechar
+UTIL_LINUX_CONF_OPTS += -Dwidechar=enabled
 else
-UTIL_LINUX_CONF_OPTS += --disable-widechar
+UTIL_LINUX_CONF_OPTS += -Dwidechar=disabled
 endif
-UTIL_LINUX_CONF_OPTS += --without-ncursesw --without-ncurses
+UTIL_LINUX_CONF_OPTS += -Dncursesw=disabled -Dncurses=disabled
 endif
 
 # if ncurses is not available, try to fallback onto slang
 ifeq ($(BR2_PACKAGE_SLANG):$(BR2_PACKAGE_NCURSES),y:)
 UTIL_LINUX_DEPENDENCIES += slang
-UTIL_LINUX_CONF_OPTS += --with-slang
+UTIL_LINUX_CONF_OPTS += -Dslang=enabled
 else
-UTIL_LINUX_CONF_OPTS += --without-slang
+UTIL_LINUX_CONF_OPTS += -Dslang=disabled
 endif
 
 # workaround for static_assert on uclibc-ng < 1.0.42
-UTIL_LINUX_CONF_ENV += CFLAGS="$(TARGET_CFLAGS) -Dstatic_assert=_Static_assert"
-
-# Unfortunately, the util-linux does LIBS="" at the end of its
-# configure script. So we have to pass the proper LIBS value when
-# calling the configure script to make configure tests pass properly,
-# and then pass it again at build time.
-UTIL_LINUX_CONF_ENV += LIBS="$(UTIL_LINUX_LINK_LIBS)"
-UTIL_LINUX_MAKE_OPTS += LIBS="$(UTIL_LINUX_LINK_LIBS)"
-
-# pthread support uses pthread_atfork, which is not available on nommu
-ifeq ($(BR2_USE_MMU),)
-UTIL_LINUX_CONF_ENV += ac_cv_lib_pthread_pthread_atfork=no
-endif
+UTIL_LINUX_CFLAGS = $(TARGET_CFLAGS) -Dstatic_assert=_Static_assert
 
 ifeq ($(BR2_PACKAGE_LIBSELINUX),y)
 UTIL_LINUX_DEPENDENCIES += libselinux
-UTIL_LINUX_CONF_OPTS += --with-selinux
+UTIL_LINUX_CONF_OPTS += -Dselinux=enabled
 else
-UTIL_LINUX_CONF_OPTS += --without-selinux
+UTIL_LINUX_CONF_OPTS += -Dselinux=disabled
 define UTIL_LINUX_SELINUX_PAMFILES_TWEAK
 	$(foreach f,su su-l,
 		$(SED) '/^.*pam_selinux.so.*$$/d' \
@@ -176,164 +175,200 @@ UTIL_LINUX_DEPENDENCIES += $(if $(BR2_PACKAGE_LINUX_PAM),linux-pam)
 UTIL_LINUX_DEPENDENCIES += $(if $(BR2_PACKAGE_PCRE2),pcre2)
 
 # Disable/Enable utilities
+# Programs of the basic set, without a dedicated option: there is no
+# --enable-all-programs in meson, so every program has to be listed. Use auto
+# instead of enabled, like --enable-all-programs did, as some of them depend on
+# kernel headers that are missing on older toolchains (e.g. linux/blkzoned.h)
+# and fail to configure when explicitly enabled.
+UTIL_LINUX_BASIC_PROGRAMS = \
+	bits blkdiscard blkpr blkzone blockdev chcpu choom col colcrt colrm \
+	ctrlaltdel dmesg enosys exch fadvise fdisks findfs findmnt flock \
+	fsfreeze fstrim getopt hexdump isosize ldattach look lsblk lsclocks \
+	lsirq lslocks lsns mcookie mkfs namei pipesz rev rtcwake script \
+	scriptutils setarch swapoff swapon whereis
+
+# Every program, used to disable all of them when none are wanted
+UTIL_LINUX_ALL_PROGRAMS = \
+	$(UTIL_LINUX_BASIC_PROGRAMS) \
+	agetty bfs cal chfn-chsh chmem cramfs eject fallocate fdformat fsck \
+	hardlink hwclock ipcmk ipcrm ipcs irqtop kill last line logger login \
+	losetup lsfd lslogins lsmem mesg minix more mount mountpoint newgrp \
+	nologin nsenter partx pg pivot_root raw rename rfkill runuser \
+	schedutils setpriv setterm su sulogin switch_root tunelp ul unshare \
+	utmpdump uuidd vipw waitpid wall wdctl wipefs write zramctl
+
 UTIL_LINUX_CONF_OPTS += \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_BINARIES),--enable-all-programs,--disable-all-programs) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_AGETTY),--enable-agetty,--disable-agetty) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_BFS),--enable-bfs,--disable-bfs) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_CAL),--enable-cal,--disable-cal) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_CHFN_CHSH),--enable-chfn-chsh,--disable-chfn-chsh) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_CHMEM),--enable-chmem,--disable-chmem) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_CRAMFS),--enable-cramfs,--disable-cramfs) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_EJECT),--enable-eject,--disable-eject) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_FALLOCATE),--enable-fallocate,--disable-fallocate) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_FDFORMAT),--enable-fdformat,--disable-fdformat) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_FSCK),--enable-fsck,--disable-fsck) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_HARDLINK),--enable-hardlink,--disable-hardlink) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_HWCLOCK),--enable-hwclock --disable-hwclock-gplv3,--disable-hwclock) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_IPCMK),--enable-ipcmk,--disable-ipcmk) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_IPCRM),--enable-ipcrm,--disable-ipcrm) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_IPCS),--enable-ipcs,--disable-ipcs) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_IRQTOP),--enable-irqtop,--disable-irqtop) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_KILL),--enable-kill,--disable-kill) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_LAST),--enable-last,--disable-last) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_LIBBLKID),--enable-libblkid,--disable-libblkid) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_LIBFDISK),--enable-libfdisk,--disable-libfdisk) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_LIBMOUNT),--enable-libmount,--disable-libmount) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_LIBSMARTCOLS),--enable-libsmartcols,--disable-libsmartcols) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_LIBUUID),--enable-libuuid,--disable-libuuid) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_LINE),--enable-line,--disable-line) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_LOGGER),--enable-logger,--disable-logger) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_LOGIN),--enable-login,--disable-login) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_LOSETUP),--enable-losetup,--disable-losetup) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_LSFD),--enable-lsfd,--disable-lsfd) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_LSLOGINS),--enable-lslogins,--disable-lslogins) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_LSMEM),--enable-lsmem,--disable-lsmem) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_MESG),--enable-mesg,--disable-mesg) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_MINIX),--enable-minix,--disable-minix) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_MORE),--enable-more,--disable-more) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_MOUNT),--enable-mount,--disable-mount) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_MOUNTPOINT),--enable-mountpoint,--disable-mountpoint) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_NEWGRP),--enable-newgrp,--disable-newgrp) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_NOLOGIN),--enable-nologin,--disable-nologin) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_NSENTER),--enable-nsenter,--disable-nsenter) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_PARTX),--enable-partx,--disable-partx) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_PG),--enable-pg,--disable-pg) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_PIVOT_ROOT),--enable-pivot_root,--disable-pivot_root) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_RAW),--enable-raw,--disable-raw) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_RENAME),--enable-rename,--disable-rename) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_RFKILL),--enable-rfkill,--disable-rfkill) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_RUNUSER),--enable-runuser,--disable-runuser) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_SCHEDUTILS),--enable-schedutils,--disable-schedutils) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_SETPRIV),--enable-setpriv,--disable-setpriv) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_SETTERM),--enable-setterm,--disable-setterm) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_SU),--enable-su,--disable-su) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_SULOGIN),--enable-sulogin,--disable-sulogin) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_SWITCH_ROOT),--enable-switch_root,--disable-switch_root) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_TUNELP),--enable-tunelp,--disable-tunelp) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_UL),--enable-ul,--disable-ul) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_UNSHARE),--enable-unshare,--disable-unshare) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_UTMPDUMP),--enable-utmpdump,--disable-utmpdump) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_UUIDD),--enable-uuidd,--disable-uuidd) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_VIPW),--enable-vipw,--disable-vipw) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_WAITPID),--enable-waitpid,--disable-waitpid) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_WALL),--enable-wall,--disable-wall) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_WDCTL),--enable-wdctl,--disable-wdctl) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_WIPEFS),--enable-wipefs,--disable-wipefs) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_WRITE),--enable-write,--disable-write) \
-	$(if $(BR2_PACKAGE_UTIL_LINUX_ZRAMCTL),--enable-zramctl,--disable-zramctl)
+	$(foreach p,$(UTIL_LINUX_BASIC_PROGRAMS),-Dbuild-$(p)=$(if $(BR2_PACKAGE_UTIL_LINUX_BINARIES),auto,disabled)) \
+	-Dbuild-agetty=$(if $(BR2_PACKAGE_UTIL_LINUX_AGETTY),enabled,disabled) \
+	-Dbuild-bfs=$(if $(BR2_PACKAGE_UTIL_LINUX_BFS),enabled,disabled) \
+	-Dbuild-cal=$(if $(BR2_PACKAGE_UTIL_LINUX_CAL),enabled,disabled) \
+	-Dbuild-chfn-chsh=$(if $(BR2_PACKAGE_UTIL_LINUX_CHFN_CHSH),enabled,disabled) \
+	-Dbuild-chmem=$(if $(BR2_PACKAGE_UTIL_LINUX_CHMEM),enabled,disabled) \
+	-Dbuild-cramfs=$(if $(BR2_PACKAGE_UTIL_LINUX_CRAMFS),enabled,disabled) \
+	-Dbuild-eject=$(if $(BR2_PACKAGE_UTIL_LINUX_EJECT),enabled,disabled) \
+	-Dbuild-fallocate=$(if $(BR2_PACKAGE_UTIL_LINUX_FALLOCATE),enabled,disabled) \
+	-Dbuild-fdformat=$(if $(BR2_PACKAGE_UTIL_LINUX_FDFORMAT),enabled,disabled) \
+	-Dbuild-fsck=$(if $(BR2_PACKAGE_UTIL_LINUX_FSCK),enabled,disabled) \
+	-Dbuild-hardlink=$(if $(BR2_PACKAGE_UTIL_LINUX_HARDLINK),enabled,disabled) \
+	-Dbuild-hwclock=$(if $(BR2_PACKAGE_UTIL_LINUX_HWCLOCK),enabled,disabled) \
+	-Dbuild-ipcmk=$(if $(BR2_PACKAGE_UTIL_LINUX_IPCMK),enabled,disabled) \
+	-Dbuild-ipcrm=$(if $(BR2_PACKAGE_UTIL_LINUX_IPCRM),enabled,disabled) \
+	-Dbuild-ipcs=$(if $(BR2_PACKAGE_UTIL_LINUX_IPCS),enabled,$(if $(BR2_PACKAGE_UTIL_LINUX_BINARIES),auto,disabled)) \
+	-Dbuild-irqtop=$(if $(BR2_PACKAGE_UTIL_LINUX_IRQTOP),enabled,disabled) \
+	-Dbuild-kill=$(if $(BR2_PACKAGE_UTIL_LINUX_KILL),enabled,disabled) \
+	-Dbuild-last=$(if $(BR2_PACKAGE_UTIL_LINUX_LAST),enabled,disabled) \
+	-Dbuild-libblkid=$(if $(BR2_PACKAGE_UTIL_LINUX_LIBBLKID),enabled,disabled) \
+	-Dbuild-libfdisk=$(if $(BR2_PACKAGE_UTIL_LINUX_LIBFDISK),enabled,disabled) \
+	-Dbuild-libmount=$(if $(BR2_PACKAGE_UTIL_LINUX_LIBMOUNT),enabled,disabled) \
+	-Dbuild-libsmartcols=$(if $(BR2_PACKAGE_UTIL_LINUX_LIBSMARTCOLS),enabled,disabled) \
+	-Dbuild-libuuid=$(if $(BR2_PACKAGE_UTIL_LINUX_LIBUUID),enabled,disabled) \
+	-Dbuild-line=$(if $(BR2_PACKAGE_UTIL_LINUX_LINE),enabled,disabled) \
+	-Dbuild-logger=$(if $(BR2_PACKAGE_UTIL_LINUX_LOGGER),enabled,disabled) \
+	-Dbuild-login=$(if $(BR2_PACKAGE_UTIL_LINUX_LOGIN),enabled,disabled) \
+	-Dbuild-losetup=$(if $(BR2_PACKAGE_UTIL_LINUX_LOSETUP),enabled,disabled) \
+	-Dbuild-lsfd=$(if $(BR2_PACKAGE_UTIL_LINUX_LSFD),enabled,disabled) \
+	-Dbuild-lslogins=$(if $(BR2_PACKAGE_UTIL_LINUX_LSLOGINS),enabled,disabled) \
+	-Dbuild-lsmem=$(if $(BR2_PACKAGE_UTIL_LINUX_LSMEM),enabled,disabled) \
+	-Dbuild-mesg=$(if $(BR2_PACKAGE_UTIL_LINUX_MESG),enabled,disabled) \
+	-Dbuild-minix=$(if $(BR2_PACKAGE_UTIL_LINUX_MINIX),enabled,disabled) \
+	-Dbuild-more=$(if $(BR2_PACKAGE_UTIL_LINUX_MORE),enabled,disabled) \
+	-Dbuild-mount=$(if $(BR2_PACKAGE_UTIL_LINUX_MOUNT),enabled,disabled) \
+	-Dbuild-mountpoint=$(if $(BR2_PACKAGE_UTIL_LINUX_MOUNTPOINT),enabled,disabled) \
+	-Dbuild-newgrp=$(if $(BR2_PACKAGE_UTIL_LINUX_NEWGRP),enabled,disabled) \
+	-Dbuild-nologin=$(if $(BR2_PACKAGE_UTIL_LINUX_NOLOGIN),enabled,disabled) \
+	-Dbuild-nsenter=$(if $(BR2_PACKAGE_UTIL_LINUX_NSENTER),enabled,disabled) \
+	-Dbuild-partx=$(if $(BR2_PACKAGE_UTIL_LINUX_PARTX),enabled,disabled) \
+	-Dbuild-pg=$(if $(BR2_PACKAGE_UTIL_LINUX_PG),enabled,disabled) \
+	-Dbuild-pivot_root=$(if $(BR2_PACKAGE_UTIL_LINUX_PIVOT_ROOT),enabled,disabled) \
+	-Dbuild-raw=$(if $(BR2_PACKAGE_UTIL_LINUX_RAW),enabled,disabled) \
+	-Dbuild-rename=$(if $(BR2_PACKAGE_UTIL_LINUX_RENAME),enabled,disabled) \
+	-Dbuild-rfkill=$(if $(BR2_PACKAGE_UTIL_LINUX_RFKILL),enabled,disabled) \
+	-Dbuild-runuser=$(if $(BR2_PACKAGE_UTIL_LINUX_RUNUSER),enabled,disabled) \
+	-Dbuild-schedutils=$(if $(BR2_PACKAGE_UTIL_LINUX_SCHEDUTILS),enabled,disabled) \
+	-Dbuild-setpriv=$(if $(BR2_PACKAGE_UTIL_LINUX_SETPRIV),enabled,disabled) \
+	-Dbuild-setterm=$(if $(BR2_PACKAGE_UTIL_LINUX_SETTERM),enabled,disabled) \
+	-Dbuild-su=$(if $(BR2_PACKAGE_UTIL_LINUX_SU),enabled,disabled) \
+	-Dbuild-sulogin=$(if $(BR2_PACKAGE_UTIL_LINUX_SULOGIN),enabled,disabled) \
+	-Dbuild-switch_root=$(if $(BR2_PACKAGE_UTIL_LINUX_SWITCH_ROOT),enabled,disabled) \
+	-Dbuild-tunelp=$(if $(BR2_PACKAGE_UTIL_LINUX_TUNELP),enabled,disabled) \
+	-Dbuild-ul=$(if $(BR2_PACKAGE_UTIL_LINUX_UL),enabled,disabled) \
+	-Dbuild-unshare=$(if $(BR2_PACKAGE_UTIL_LINUX_UNSHARE),enabled,disabled) \
+	-Dbuild-utmpdump=$(if $(BR2_PACKAGE_UTIL_LINUX_UTMPDUMP),enabled,disabled) \
+	-Dbuild-uuidd=$(if $(BR2_PACKAGE_UTIL_LINUX_UUIDD),enabled,disabled) \
+	-Dbuild-vipw=$(if $(BR2_PACKAGE_UTIL_LINUX_VIPW),enabled,disabled) \
+	-Dbuild-waitpid=$(if $(BR2_PACKAGE_UTIL_LINUX_WAITPID),enabled,disabled) \
+	-Dbuild-wall=$(if $(BR2_PACKAGE_UTIL_LINUX_WALL),enabled,disabled) \
+	-Dbuild-wdctl=$(if $(BR2_PACKAGE_UTIL_LINUX_WDCTL),enabled,disabled) \
+	-Dbuild-wipefs=$(if $(BR2_PACKAGE_UTIL_LINUX_WIPEFS),enabled,disabled) \
+	-Dbuild-write=$(if $(BR2_PACKAGE_UTIL_LINUX_WRITE),enabled,disabled) \
+	-Dbuild-zramctl=$(if $(BR2_PACKAGE_UTIL_LINUX_ZRAMCTL),enabled,disabled)
 
 # In the host version of util-linux, we only require libuuid and
 # libmount (plus libblkid as an indirect dependency of libmount).
 # So disable all of the programs, unless BR2_PACKAGE_HOST_UTIL_LINUX is set
 
 HOST_UTIL_LINUX_CONF_OPTS += \
-	--enable-libblkid \
-	--enable-libmount \
-	--enable-libuuid \
-	--without-libmagic \
-	--without-ncurses \
-	--without-ncursesw \
-	--without-tinfo
+	-Dbuild-libblkid=enabled \
+	-Dbuild-libmount=enabled \
+	-Dbuild-libuuid=enabled \
+	-Dcryptsetup=disabled \
+	-Dcryptsetup-dlopen=disabled \
+	-Dbtrfs=disabled \
+	-Deconf=disabled \
+	-Dlibuser=disabled \
+	-Dlibutempter=disabled \
+	-Dmagic=disabled \
+	-Dncurses=disabled \
+	-Dncursesw=disabled \
+	-Dreadline=disabled \
+	-Dslang=disabled \
+	-Dtinfo=disabled \
+	-Dwidechar=disabled
 
 # Disable raw command since starting from version 2.37 needs a
 # work-around to build but in the end we don't need at all.
 HOST_UTIL_LINUX_CONF_OPTS += \
-	--disable-raw
+	-Dbuild-raw=disabled
 
 ifeq ($(BR2_PACKAGE_HOST_UTIL_LINUX),y)
-HOST_UTIL_LINUX_CONF_OPTS += --disable-makeinstall-chown
+HOST_UTIL_LINUX_CONF_OPTS += \
+	-Dbuild-libfdisk=enabled \
+	-Dbuild-libsmartcols=enabled \
+	-Dzlib=enabled
 # disable commands that have ncurses dependency, as well as
 # other ones that are useless on the host
 HOST_UTIL_LINUX_CONF_OPTS += \
-	--disable-agetty \
-	--disable-chfn-chsh \
-	--disable-chmem \
-	--disable-ipcmk \
-	--disable-liblastlog2 \
-	--disable-login \
-	--disable-lsfd \
-	--disable-lslogins \
-	--disable-mesg \
-	--disable-more \
-	--disable-newgrp \
-	--disable-nologin \
-	--disable-nsenter \
-	--disable-pg \
-	--disable-rfkill \
-	--disable-runuser \
-	--disable-schedutils \
-	--disable-setpriv \
-	--disable-setterm \
-	--disable-su \
-	--disable-sulogin \
-	--disable-tunelp \
-	--disable-ul \
-	--disable-unshare \
-	--disable-uuidd \
-	--disable-vipw \
-	--disable-wall \
-	--disable-wdctl \
-	--disable-write \
-	--disable-zramctl
+	-Dbuild-agetty=disabled \
+	-Dbuild-chfn-chsh=disabled \
+	-Dbuild-chmem=disabled \
+	-Dbuild-ipcmk=disabled \
+	-Dbuild-login=disabled \
+	-Dbuild-lsfd=disabled \
+	-Dbuild-lslogins=disabled \
+	-Dbuild-mesg=disabled \
+	-Dbuild-more=disabled \
+	-Dbuild-newgrp=disabled \
+	-Dbuild-nologin=disabled \
+	-Dbuild-nsenter=disabled \
+	-Dbuild-pg=disabled \
+	-Dbuild-rfkill=disabled \
+	-Dbuild-runuser=disabled \
+	-Dbuild-schedutils=disabled \
+	-Dbuild-setpriv=disabled \
+	-Dbuild-setterm=disabled \
+	-Dbuild-su=disabled \
+	-Dbuild-sulogin=disabled \
+	-Dbuild-tunelp=disabled \
+	-Dbuild-ul=disabled \
+	-Dbuild-unshare=disabled \
+	-Dbuild-uuidd=disabled \
+	-Dbuild-vipw=disabled \
+	-Dbuild-wall=disabled \
+	-Dbuild-wdctl=disabled \
+	-Dbuild-write=disabled \
+	-Dbuild-zramctl=disabled
 # Used by cramfs utils
 HOST_UTIL_LINUX_DEPENDENCIES += host-zlib
 else
-HOST_UTIL_LINUX_CONF_OPTS += --disable-all-programs
+HOST_UTIL_LINUX_CONF_OPTS += \
+	-Dbuild-libfdisk=disabled \
+	-Dbuild-libsmartcols=disabled \
+	-Dzlib=disabled \
+	$(foreach p,$(UTIL_LINUX_ALL_PROGRAMS),-Dbuild-$(p)=disabled)
 endif
 
 # Install libmount Python bindings
 ifeq ($(BR2_PACKAGE_PYTHON3),y)
-UTIL_LINUX_CONF_OPTS += --with-python
-UTIL_LINUX_DEPENDENCIES += python3
-ifeq ($(BR2_PACKAGE_UTIL_LINUX_LIBMOUNT),y)
-UTIL_LINUX_CONF_OPTS += --enable-pylibmount
+UTIL_LINUX_CONF_OPTS += \
+	-Dbuild-python=enabled \
+	-Dbuild-pylibmount=$(if $(BR2_PACKAGE_UTIL_LINUX_LIBMOUNT),enabled,disabled)
+UTIL_LINUX_DEPENDENCIES += python3 host-python3
+UTIL_LINUX_CONF_ENV += \
+	_PYTHON_SYSCONFIGDATA_NAME=$(PKG_PYTHON_SYSCONFIGDATA_NAME) \
+	PYTHONPATH=$(PYTHON3_PATH)
 else
-UTIL_LINUX_CONF_OPTS += --disable-pylibmount
-endif
-else
-UTIL_LINUX_CONF_OPTS += --without-python
+UTIL_LINUX_CONF_OPTS += -Dbuild-python=disabled -Dbuild-pylibmount=disabled
 endif
 
 ifeq ($(BR2_PACKAGE_READLINE),y)
-UTIL_LINUX_CONF_OPTS += --with-readline
-UTIL_LINUX_LINK_LIBS += $(if $(BR2_STATIC_LIBS),-lcurses)
+UTIL_LINUX_CONF_OPTS += -Dreadline=enabled
 UTIL_LINUX_DEPENDENCIES += readline
 else
-UTIL_LINUX_CONF_OPTS += --without-readline
+UTIL_LINUX_CONF_OPTS += -Dreadline=disabled
 endif
 
 ifeq ($(BR2_PACKAGE_AUDIT),y)
-UTIL_LINUX_CONF_OPTS += --with-audit
+UTIL_LINUX_CONF_OPTS += -Daudit=enabled
 UTIL_LINUX_DEPENDENCIES += audit
 else
-UTIL_LINUX_CONF_OPTS += --without-audit
+UTIL_LINUX_CONF_OPTS += -Daudit=disabled
 endif
 
 ifeq ($(BR2_PACKAGE_FILE),y)
-UTIL_LINUX_CONF_OPTS += --with-libmagic
+UTIL_LINUX_CONF_OPTS += -Dmagic=enabled
 UTIL_LINUX_DEPENDENCIES += file
 else
-UTIL_LINUX_CONF_OPTS += --without-libmagic
+UTIL_LINUX_CONF_OPTS += -Dmagic=disabled
 endif
 
 # Install PAM configuration files
@@ -359,9 +394,9 @@ endif
 
 UTIL_LINUX_POST_INSTALL_TARGET_HOOKS += UTIL_LINUX_GETTY_SYMLINK
 
-$(eval $(autotools-package))
-$(eval $(host-autotools-package))
+$(eval $(meson-package))
+$(eval $(host-meson-package))
 
-# Must be included after the autotools-package call, to make sure all variables
+# Must be included after the meson-package call, to make sure all variables
 # are available
 include package/util-linux/util-linux-libs/util-linux-libs.mk
