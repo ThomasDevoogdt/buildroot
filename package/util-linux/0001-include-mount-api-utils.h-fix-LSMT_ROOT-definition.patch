@@ -1,4 +1,4 @@
-From 72ff3b8998a675900fcb7c18c0e03f1552b13a8b Mon Sep 17 00:00:00 2001
+From 180d13704de7669411008506b22497cd67358db4 Mon Sep 17 00:00:00 2001
 From: Shubham Chakraborty <chakrabortyshubham66@gmail.com>
 Date: Tue, 14 Apr 2026 11:04:08 +0530
 Subject: [PATCH] include/mount-api-utils.h: fix LSMT_ROOT definition
@@ -27,7 +27,7 @@ Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/include/mount-api-utils.h b/include/mount-api-utils.h
-index a916f99..87e173e 100644
+index a916f99f9..87e173ea4 100644
 --- a/include/mount-api-utils.h
 +++ b/include/mount-api-utils.h
 @@ -339,7 +339,7 @@ struct ul_statmount {
@@ -40,5 +40,5 @@ index a916f99..87e173e 100644
  #endif
  
 -- 
-2.53.0
+2.43.0
 
