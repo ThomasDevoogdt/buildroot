@@ -12,17 +12,20 @@ UTIL_LINUX_VERSION = $(UTIL_LINUX_VERSION_MAJOR).5
 UTIL_LINUX_SOURCE = util-linux-$(UTIL_LINUX_VERSION).tar.xz
 UTIL_LINUX_SITE = $(BR2_KERNEL_MIRROR)/linux/utils/util-linux/v$(UTIL_LINUX_VERSION_MAJOR)
 
-# README.licensing claims that some files are GPL-2.0 only, but this is not
-# true. Some files are GPL-3.0+ but only in tests and optionally in hwclock
-# (but we disable that option). rfkill uses an ISC-style license.
+# Some files are GPL-3.0+ or LGPL-3.0+ but only in tests, python bindings,
+# and optionally in hwclock (but we disable those options).
 UTIL_LINUX_LICENSE = \
 	GPL-2.0+, \
-	BSD-4-Clause, \
-	LGPL-2.1+ (libblkid, libfdisk, libmount), \
+	GPL-2.0 (lscpu-dmi, nsenter), \
+	GPL-1.0+ (fdisk), \
+	BSD-4-Clause-UC, \
+	LGPL-2.1+ (libblkid, libfdisk, libmount, libsmartcols), \
 	BSD-3-Clause (libuuid), \
-	BSD-2-Clause (xxhash), \
+	BSD-2-Clause (lastlog2, liblastlog2, pam_lastlog2, xxhash), \
+	EUPL-1.2 (coresched), \
 	ISC (rfkill), \
-	MIT (hardlink, flock)
+	MIT (crc64, flock, hardlink), \
+	Public Domain
 UTIL_LINUX_LICENSE_FILES = README.licensing \
 	Documentation/licenses/COPYING.BSD-2-Clause \
 	Documentation/licenses/COPYING.BSD-3-Clause \
@@ -30,7 +33,6 @@ UTIL_LINUX_LICENSE_FILES = README.licensing \
 	Documentation/licenses/COPYING.EUPL-1.2 \
 	Documentation/licenses/COPYING.GPL-2.0-only \
 	Documentation/licenses/COPYING.GPL-2.0-or-later \
-	Documentation/licenses/COPYING.GPL-3.0-or-later \
 	Documentation/licenses/COPYING.ISC \
 	Documentation/licenses/COPYING.LGPL-2.1-or-later \
 	Documentation/licenses/COPYING.MIT
