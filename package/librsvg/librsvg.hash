@@ -1,5 +1,5 @@
-# From https://download.gnome.org/sources/librsvg/2.50/librsvg-2.50.9.sha256sum
-sha256  518905fffa879b6c7f3db1aae961cf31333e0eadc7b4cdd4f531707868c54b53  librsvg-2.50.9.tar.xz
+# Locally calculated after Buildroot Cargo vendoring
+sha256  9af5dc183833a5f3b27baeb9ecc825b3e1724031b5f4b4b0adcfbda7699c8d37  librsvg-2.62.4-cargo6.tar.gz
 
 # Locally computed
 sha256  dc626520dcd53a22f727af3ee42c770e56c97a64fe3adb063799d8ab032fe551  COPYING.LIB
