@@ -4,8 +4,8 @@
 #
 ################################################################################
 
-LIBSOUP3_VERSION_MAJOR = 3.7
-LIBSOUP3_VERSION = $(LIBSOUP3_VERSION_MAJOR).3
+LIBSOUP3_VERSION_MAJOR = 3.8
+LIBSOUP3_VERSION = $(LIBSOUP3_VERSION_MAJOR).1
 LIBSOUP3_SOURCE = libsoup-$(LIBSOUP3_VERSION).tar.xz
 LIBSOUP3_SITE = https://download.gnome.org/sources/libsoup/$(LIBSOUP3_VERSION_MAJOR)
 LIBSOUP3_LICENSE = LGPL-2.0+
