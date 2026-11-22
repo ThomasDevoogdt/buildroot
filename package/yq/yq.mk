@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-YQ_VERSION = 4.49.2
+YQ_VERSION = 4.54.3
 YQ_SITE = $(call github,mikefarah,yq,v$(YQ_VERSION))
 YQ_LICENSE = MIT
 YQ_LICENSE_FILES = LICENSE
