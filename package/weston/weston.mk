@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-WESTON_VERSION = 16.0.0
+WESTON_VERSION = 16.0.2
 WESTON_SITE = https://gitlab.freedesktop.org/wayland/weston/-/releases/$(WESTON_VERSION)/downloads
 WESTON_SOURCE = weston-$(WESTON_VERSION).tar.xz
 WESTON_LICENSE = MIT
@@ -19,6 +19,7 @@ WESTON_DEPENDENCIES = host-pkgconf wayland wayland-protocols \
 WESTON_CONF_OPTS = \
 	-Ddoc=false \
 	-Dbackend-vnc=false \
+	-Dtests=false \
 	-Dtools=calibrator,debug,info,terminal,touch-calibrator
 
 ifeq ($(BR2_PACKAGE_WESTON_SIMPLE_CLIENTS),y)

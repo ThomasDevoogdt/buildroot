@@ -1,0 +1,31 @@
+From 000000000000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Thomas Devoogdt <thomas@devoogdt.com>
+Date: Sat, 21 Nov 2026 22:00:00 +0100
+Subject: [PATCH] backend-drm: avoid __VA_OPT__ in debug macro
+
+__VA_OPT__ is only available with recent C preprocessors and is not
+understood by the old compilers supported by Buildroot. Use the traditional
+GNU ## token pasting extension already relied on throughout Weston instead.
+
+Upstream: pending
+Signed-off-by: Thomas Devoogdt <thomas@devoogdt.com>
+---
+ libweston/backend-drm/drm-internal.h | 9 +--------
+ 1 file changed, 2 insertions(+), 9 deletions(-)
+
+diff --git a/libweston/backend-drm/drm-internal.h b/libweston/backend-drm/drm-internal.h
+index 829a1f4..f5ceb7b 100644
+--- a/libweston/backend-drm/drm-internal.h
++++ b/libweston/backend-drm/drm-internal.h
+@@ -122,9 +122,2 @@
+-#define DO_DRM_DEBUG_COMPLEX(scope, ...) \
+-	weston_log_scope_printf(scope, __VA_ARGS__)
+-
+-#define DO_DRM_DEBUG(scope, string) \
+-	weston_log_scope_puts(scope, string)
+-
+-#define drm_debug(b, format, ...)				\
+-	DO_DRM_DEBUG ## __VA_OPT__(_COMPLEX)			\
+-	((b)->debug, format __VA_OPT__(,) __VA_ARGS__)
++#define drm_debug(b, format, ...) \
++	weston_log_scope_printf((b)->debug, format, ##__VA_ARGS__)

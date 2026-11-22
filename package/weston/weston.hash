@@ -1,4 +1,3 @@
-# From https://lore.freedesktop.org/wayland-devel/alXq76OX4dVWoP3M@xpredator/T/#u
-sha256  dfb32e2bccabda957b94a8d0ec6075acd18c71c87ebc543ee3e618d294ca0f7f  weston-16.0.0.tar.xz
-sha512  23b7a1138833f8aacc57758231d14c2f1bc9ec20ad2fef125ffffb8d63853968e8a8ed2d8bbf6ad1600d7f40358a705ca24838a683e01b1c84279cf8ae1cfe48  weston-16.0.0.tar.xz
+# From https://gitlab.freedesktop.org/wayland/weston/-/releases/16.0.2/downloads/weston-16.0.2.tar.xz.sha256sum
+sha256  49dd87d18cb229384264d2f69cb5a51f14f61a111e9227bfedb91b3ca8c39643  weston-16.0.2.tar.xz
 sha256  fdb65868f65d0fbdb05c2d3b779e10ce9969fa0c4b9262ba4f260e87086ab860  COPYING
