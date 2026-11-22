@@ -1,5 +1,6 @@
 menuconfig BR2_PACKAGE_SEATD
 	bool "seatd"
+	depends on BR2_USE_MMU # fork()
 	select BR2_PACKAGE_SEATD_BUILTIN \
 		if !BR2_PACKAGE_SYSTEMD_LOGIND && !BR2_PACKAGE_SEATD_DAEMON
 	help
@@ -21,3 +22,6 @@ config BR2_PACKAGE_SEATD_DAEMON
 	  Build the seatd daemon and support for it inside libseat.
 
 endif
+
+comment "seatd needs a toolchain w/ MMU"
+	depends on !BR2_USE_MMU

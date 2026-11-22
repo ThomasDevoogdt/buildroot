@@ -4,12 +4,13 @@ comment "wlroots needs udev, EGL, OpenGL ES and GBM support"
 		!BR2_PACKAGE_HAS_LIBGLES || \
 		!BR2_PACKAGE_HAS_UDEV
 
-comment "wlroots needs a toolchain w/ threads, dynamic library"
+comment "wlroots needs a toolchain w/ MMU, threads, dynamic library"
 	depends on !BR2_TOOLCHAIN_HAS_THREADS || \
-		BR2_STATIC_LIBS
+		BR2_STATIC_LIBS || !BR2_USE_MMU
 
 config BR2_PACKAGE_WLROOTS
 	bool "wlroots"
+	depends on BR2_USE_MMU # seatd
 	depends on !BR2_STATIC_LIBS # wayland
 	depends on BR2_TOOLCHAIN_HAS_THREADS # libdrm, wayland
 	depends on BR2_PACKAGE_HAS_UDEV # libinput
